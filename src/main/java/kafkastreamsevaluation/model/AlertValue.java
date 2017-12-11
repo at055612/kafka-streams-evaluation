@@ -39,7 +39,8 @@ public class AlertValue implements MessageValue {
 
         for (int i = 0; i < subjects.size(); i++) {
             String key = KEY_SUBJECT_PREFIX + i;
-            String value = subjects.get(i).toMessageString();
+            MessageValue subject = subjects.get(i);
+            String value = subject != null ? subject.toMessageString() : "";
             builder.put(key, value);
         }
 
