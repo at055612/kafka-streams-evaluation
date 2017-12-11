@@ -1,0 +1,60 @@
+apply plugin: 'java'
+apply plugin: 'idea'
+
+def gradleVer='4.3.1'
+
+repositories {
+    maven {
+        //TODO fill this in
+    }
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = gradleVer
+}
+
+ext.versions = [
+    slf4j: '1.7.24', 
+    logback: '1.2.1', 
+    jackson: '2.8.9', 
+    kafka: '0.10.0.1', //CDH5.11 uses kafka 0.10.0+kafka2.1
+]
+// In this section you declare the dependencies for your production and test code
+dependencies {
+    // The production code uses the SLF4J logging API at compile time
+    compile "ch.qos.logback:logback-classic:$versions.logback"
+    compile "ch.qos.logback:logback-core:$versions.logback"
+    compile "com.fasterxml.jackson.core:jackson-annotations:$versions.jackson"
+    compile "com.fasterxml.jackson.core:jackson-core:$versions.jackson"
+    compile "com.fasterxml.jackson.core:jackson-databind:$versions.jackson"
+    compile "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:$versions.jackson"
+    compile "com.google.guava:guava:21.0"
+    compile "org.apache.kafka:kafka-clients:$versions.kafka"
+    compile "org.apache.kafka:kafka-streams:$versions.kafka"
+    compile "org.slf4j:slf4j-api:$versions.slf4j"
+    compile "org.slf4j:log4j-over-slf4j:$versions.slf4j"
+    compile "io.vavr:vavr:0.9.1"
+
+    testCompile "org.assertj:assertj-core:3.6.2"
+    testCompile 'junit:junit:4.12'
+}
+
+
+configurations {
+    all {
+        exclude group: "org.slf4j", module: "slf4j-log4j12"
+        exclude group: "log4j", module: "log4j"
+
+        resolutionStrategy {
+            dependencySubstitution {
+                substitute module('log4j:log4j') with module('org.slf4j:log4j-over-slf4j:$versions.slf4j')
+            }
+
+            forcedModules = [
+                    //>=v21 removes MoreExecutors.sameThreadExecutor() which is needed by curator 2.11
+                    //libs.guava
+            ]
+        }
+    }
+}
+
