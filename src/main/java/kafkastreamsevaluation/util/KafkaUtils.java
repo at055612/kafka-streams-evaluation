@@ -1,4 +1,4 @@
-package kafkastreamsevaluation;
+package kafkastreamsevaluation.util;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -22,7 +22,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 //TODO currently only <String,String> supported
 public class KafkaUtils {
