@@ -11,8 +11,6 @@
 
     <logger name="kafkastreamsevaluation" level="debug"/>
 
-    <logger name="org.apache.kafka.streams" level="error"/>
-
     <root level="error">
         <appender-ref ref="STDOUT" />
     </root>

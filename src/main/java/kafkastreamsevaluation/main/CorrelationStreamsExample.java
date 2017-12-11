@@ -3,8 +3,11 @@ package kafkastreamsevaluation.main;
 import com.google.common.collect.Maps;
 import io.vavr.Tuple;
 import kafkastreamsevaluation.Constants;
-import kafkastreamsevaluation.util.KafkaUtils;
 import kafkastreamsevaluation.MessageValueTimestampExtractor;
+import kafkastreamsevaluation.model.AlertValue;
+import kafkastreamsevaluation.model.BasicMessageValue;
+import kafkastreamsevaluation.model.MessageValue;
+import kafkastreamsevaluation.util.KafkaUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -12,14 +15,13 @@ import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.KStreamBuilder;
 import org.apache.kafka.streams.kstream.KTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import kafkastreamsevaluation.model.AlertValue;
-import kafkastreamsevaluation.model.BasicMessageValue;
-import kafkastreamsevaluation.model.MessageValue;
 
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -35,13 +37,21 @@ public class CorrelationStreamsExample {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CorrelationStreamsExample.class);
 
-    public static final String STATE_B_TOPIC = "state-A";
+    public static final String TOPIC_A_EVENTS = "A-events";
+    public static final String TOPIC_B_EVENTS = "B-events";
     public static final String GROUP_ID = CorrelationStreamsExample.class.getSimpleName() + "-consumer";
     public static final String STREAMS_APP_ID = CorrelationStreamsExample.class.getSimpleName() + "-streamsApp";
 
     public static final String EVENT_TYPE_A = "A";
     public static final String EVENT_TYPE_B = "B";
     public static final String ALERT_TYPE_A_B = "A-B";
+
+    public static final String USER_1 = "user1";
+    public static final String USER_2 = "user2";
+    public static final String USER_3 = "user3";
+
+    public static final String STATE_IN = "IN";
+    public static final String STATE_OUT = "OUT";
 
     public static void main(String[] args) {
 
@@ -58,7 +68,9 @@ public class CorrelationStreamsExample {
         //Start the logging consumer for both input and alert topics
         ExecutorService loggerExecutorService = KafkaUtils.startMessageLoggerConsumer(
                 GROUP_ID,
-                Arrays.asList(Constants.INPUT_TOPIC, Constants.ALERT_TOPIC));
+                Arrays.asList(TOPIC_A_EVENTS, TOPIC_B_EVENTS, Constants.ALERT_TOPIC));
+
+        KafkaUtils.sleep(2_000);
 
         //TODO consider a KTable-KTable join of state A and state B
         //Need to consider how we deal with no explicit close of a state, e.g. time it out
@@ -103,32 +115,72 @@ public class CorrelationStreamsExample {
         Serde<MessageValue> valueSerde = MessageValue.serde();
 
         KStreamBuilder builder = new KStreamBuilder();
+        KStream<String, MessageValue> allEvents = builder.stream(keySerde, valueSerde, Constants.INPUT_TOPIC);
 
-        KTable<String, MessageValue> stateATable = builder.table(keySerde, valueSerde, Constants.INPUT_TOPIC)
-                .filter(KafkaUtils.buildAlwaysTrueStreamPeeker(STREAMS_APP_ID)) //peek at the stream and log all msgs
+        KStream<String, MessageValue> aEvents = allEvents
                 .filter((userId, msgVal) ->
                         msgVal.getAttrValue(BasicMessageValue.KEY_EVENT_TYPE)
                                 .filter(eventType -> eventType.equals(EVENT_TYPE_A))
                                 .isPresent());
 
+        KTable<String, MessageValue> aState = aEvents.reduceByKey((v1, v2) -> v2, keySerde, valueSerde, "aTable");
 
-        KTable<String, MessageValue> stateBTable = builder.table(keySerde, valueSerde, Constants.INPUT_TOPIC)
-                .filter(KafkaUtils.buildAlwaysTrueStreamPeeker(STREAMS_APP_ID)) //peek at the stream and log all msgs
+        KStream<String, MessageValue> bEvents = allEvents
                 .filter((userId, msgVal) ->
                         msgVal.getAttrValue(BasicMessageValue.KEY_EVENT_TYPE)
                                 .filter(eventType -> eventType.equals(EVENT_TYPE_B))
                                 .isPresent());
 
+        KTable<String, MessageValue> bState = bEvents.reduceByKey((v1, v2) -> v2, keySerde, valueSerde, "bTable");
 
-        stateATable.outerJoin(stateBTable, Tuple::of)
-                .mapValues(val -> (MessageValue) new AlertValue(
+        aState.join(bState, Tuple::of)
+                .mapValues(val -> {
+                    LOGGER.info("\n  A: {}\n  B: {}", val._1(), val._2());
+
+                    return (MessageValue) new AlertValue(
                         ZonedDateTime.now(),
                         ALERT_TYPE_A_B,
                         "description",
-                        Arrays.asList(val._1(), val._2())))
+                        Arrays.asList(val._1(), val._2()));
+                })
                 .toStream()
                 .to(keySerde, valueSerde, Constants.ALERT_TOPIC);
 
+
+//        KStreamBuilder builderA = new KStreamBuilder();
+//        KStreamBuilder builderB = new KStreamBuilder();
+//
+//        KTable<String, MessageValue> stateATable = builderA.table(keySerde, valueSerde, TOPIC_A_EVENTS);
+//                stateATable.filter(KafkaUtils.buildAlwaysTrueStreamPeeker(STREAMS_APP_ID)); //peek at the stream and log all msgs
+
+//                .filter((userId, msgVal) ->
+//                        msgVal.getAttrValue(BasicMessageValue.KEY_EVENT_TYPE)
+//                                .filter(eventType -> eventType.equals(EVENT_TYPE_A))
+//                                .isPresent())
+//                .filter(KafkaUtils.buildAlwaysTrueStreamPeeker(STREAMS_APP_ID)); //peek at the stream and log all msgs
+
+
+//        KTable<String, MessageValue> stateBTable = builderA.table(keySerde, valueSerde, TOPIC_B_EVENTS);
+//                stateBTable.filter(KafkaUtils.buildAlwaysTrueStreamPeeker(STREAMS_APP_ID)); //peek at the stream and log all msgs
+//                .filter((userId, msgVal) ->
+//                        msgVal.getAttrValue(BasicMessageValue.KEY_EVENT_TYPE)
+//                                .filter(eventType -> eventType.equals(EVENT_TYPE_B))
+//                                .isPresent())
+//                .filter(KafkaUtils.buildAlwaysTrueStreamPeeker(STREAMS_APP_ID)); //peek at the stream and log all msgs
+
+
+//        stateATable.join(stateBTable, Tuple::of)
+//                .filter((k,v) -> {
+//                    LOGGER.info("Seen key [{}], value [{}]");
+//                    return true;
+//                })
+//                .mapValues(val -> (MessageValue) new AlertValue(
+//                        ZonedDateTime.now(),
+//                        ALERT_TYPE_A_B,
+//                        "description",
+//                        Arrays.asList(val._1(), val._2())))
+//                .toStream()
+//                .to(keySerde, valueSerde, Constants.ALERT_TOPIC);
 
 
         final KafkaStreams kafkaStreams = new KafkaStreams(builder, streamsConfig);
@@ -150,7 +202,35 @@ public class CorrelationStreamsExample {
 
         //TODO fill this in
 
+        records.add(buildAEvent(baseTime.plusMinutes(offsetMins++), USER_1, STATE_IN)); //user1 in-
+        records.add(buildBEvent(baseTime.plusMinutes(offsetMins++), USER_1, STATE_IN)); //user1 in-in
+        records.add(buildBEvent(baseTime.plusMinutes(offsetMins++), USER_2, STATE_OUT)); //user1 in-in
+        records.add(buildAEvent(baseTime.plusMinutes(offsetMins++), USER_1, STATE_OUT)); //user1 out-in
+        records.add(buildBEvent(baseTime.plusMinutes(offsetMins++), USER_1, STATE_OUT)); //user1 out-out
+
         return records;
+    }
+
+    private static ProducerRecord<String, String> buildAEvent(final ZonedDateTime zonedDateTime,
+                                                       final String userId,
+                                                       final String state) {
+        MessageValue messageValue = new BasicMessageValue(zonedDateTime,
+                BasicMessageValue.KEY_EVENT_TYPE, EVENT_TYPE_A,
+                BasicMessageValue.KEY_IN_OUT, state,
+                BasicMessageValue.KEY_DESCRIPTION, "This message was defined at " + Instant.now().toString());
+
+        return new ProducerRecord<>(Constants.INPUT_TOPIC, userId, messageValue.toMessageString());
+    }
+
+    private static ProducerRecord<String, String> buildBEvent(final ZonedDateTime zonedDateTime,
+                                                       final String userId,
+                                                       final String state) {
+        MessageValue messageValue = new BasicMessageValue(zonedDateTime,
+                BasicMessageValue.KEY_EVENT_TYPE, EVENT_TYPE_B,
+                BasicMessageValue.KEY_IN_OUT, state,
+                BasicMessageValue.KEY_DESCRIPTION, "This message was defined at " + Instant.now().toString());
+
+        return new ProducerRecord<>(Constants.INPUT_TOPIC, userId, messageValue.toMessageString());
     }
 
 

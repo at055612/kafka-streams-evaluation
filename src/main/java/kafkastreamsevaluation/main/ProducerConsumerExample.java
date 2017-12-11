@@ -19,17 +19,22 @@ public class ProducerConsumerExample {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ProducerConsumerExample.class);
 
-    public static final String INPUT_TOPIC = "p1test-input";
+    public static final String INPUT_TOPIC = "input";
     public static final String GROUP_ID = ProducerConsumerExample.class.getSimpleName();
 
     public static void main(String[] args) {
 
+
         LOGGER.info("main called with args [{}]", Arrays.stream(args).collect(Collectors.joining(" ")));
         LOGGER.info("GroupId: [{}]", GROUP_ID);
+
         try (KafkaProducer<String, String> kafkaProducer = KafkaUtils.getKafkaProducer()) {
             ExecutorService loggerExecutorService = KafkaUtils.startMessageLoggerConsumer(
                     GROUP_ID,
                     Collections.singletonList(INPUT_TOPIC));
+
+            //little sleep to ensure consumer is started
+//            KafkaUtils.sleep(200);
 
 
             ProducerRecord<String, String> producerRecord = new ProducerRecord<>(

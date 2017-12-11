@@ -14,6 +14,7 @@ import java.util.Optional;
 public class BasicMessageValue implements MessageValue {
     public static final String KEY_EVENT_TYPE = "eventType";
     public static final String KEY_LOCATION = "location";
+    public static final String KEY_IN_OUT = "in-out";
     public static final String KEY_DESCRIPTION = "description";
     private final ZonedDateTime eventTime;
     private final Map<String, String> attrMap;
@@ -39,6 +40,10 @@ public class BasicMessageValue implements MessageValue {
     }
 
     public static MessageValue fromMessageString(String messageValue) {
+        if (messageValue == null || messageValue.isEmpty()) {
+            return null;
+        }
+
         Preconditions.checkNotNull(messageValue);
         String[] splits = messageValue.split(",");
 

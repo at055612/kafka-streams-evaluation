@@ -1,5 +1,6 @@
 package kafkastreamsevaluation.util;
 
+import kafkastreamsevaluation.model.MessageValue;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -14,13 +15,21 @@ import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import kafkastreamsevaluation.model.MessageValue;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 //TODO currently only <String,String> supported
@@ -31,8 +40,8 @@ public class KafkaUtils {
     //TODO should be in a config file
     //Can be a sub-set of all the kafka brokers, but enough to be sure to get a connection to one
     //to get the info on the full cluster
-    public static final String KAFKA_BOOTSTRAP_SERVERS = "TODO";
-    public static final String KAFKA_ZOOKEEPER_QUORUM = "TODO";
+    public static final String KAFKA_BOOTSTRAP_SERVERS = "kafka:9092";
+    public static final String KAFKA_ZOOKEEPER_QUORUM = "127.0.0.1:2181/kafka";
 
     public static KafkaProducer<String, String> buildKafkaProducer() {
         Map<String, Object> producerProps = new HashMap<>();
@@ -168,13 +177,8 @@ public class KafkaUtils {
                 while (!Thread.currentThread().isInterrupted()) {
                     final ConsumerRecords<String, String> records = kafkaConsumer.poll(100);
                     if (isFirstPoll) {
-                        try {
-                            //wait for subscription to complete
-                            subscribedSemaphore.acquire();
-                        } catch (InterruptedException e) {
-                            LOGGER.error("Thread interrupted");
-                            Thread.currentThread().interrupt();
-                        }
+                        //first successful poll so release a permit to mark the subscription as successful
+                        subscribedSemaphore.release();
                     }
                     isFirstPoll = false;
                     for (ConsumerRecord<String, String> record : records) {
@@ -187,6 +191,16 @@ public class KafkaUtils {
                 kafkaConsumer.close();
             }
         });
+
+        LOGGER.info("Waiting for consumer to start on topics {}", topics);
+        try {
+            if (!subscribedSemaphore.tryAcquire(30, TimeUnit.SECONDS)) {
+                throw new RuntimeException("Failed to subscribe after 30s");
+            }
+        } catch (InterruptedException e) {
+            LOGGER.error("Thread interrupted");
+            Thread.currentThread().interrupt();
+        }
 
         LOGGER.info("Consumer started on topics {}", topics);
 
@@ -233,7 +247,7 @@ public class KafkaUtils {
         return ProducerHolder.kafkaProducer;
     }
 
-    public static Predicate<String,MessageValue> buildAlwaysTrueStreamPeeker(final String appId) {
+    public static Predicate<String, MessageValue> buildAlwaysTrueStreamPeeker(final String appId) {
         return (k, v) -> {
             LOGGER.info("Seen message in stream - \n  appId = {}\n  key = {}\n  value = {}",
                     appId, k.toString(), v.toString());

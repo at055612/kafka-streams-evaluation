@@ -23,7 +23,7 @@ public class MessageValueSerde implements Serde<MessageValue>, Serializer<Messag
 
     @Override
     public byte[] serialize(final String topic, final MessageValue messageValue) {
-        return stringSerde.serializer().serialize(topic, messageValue.toMessageString());
+        return stringSerde.serializer().serialize(topic, messageValue != null ? messageValue.toMessageString() : null);
     }
 
     @Override

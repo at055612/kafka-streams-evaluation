@@ -22,6 +22,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
@@ -54,7 +55,8 @@ public class EventMatchStreamsExample {
         //Start the logging consumer for both input and alert topics
         ExecutorService loggerExecutorService = KafkaUtils.startMessageLoggerConsumer(
                 GROUP_ID,
-                Arrays.asList(Constants.INPUT_TOPIC, Constants.ALERT_TOPIC));
+                Collections.singletonList(Constants.ALERT_TOPIC));
+//                Arrays.asList(Constants.INPUT_TOPIC, Constants.ALERT_TOPIC));
 
         //now produce some messages on the input topic, and make sure kafka has accepted them all
         try (KafkaProducer<String, String> kafkaProducer = KafkaUtils.getKafkaProducer()) {
@@ -95,7 +97,7 @@ public class EventMatchStreamsExample {
 
         KStreamBuilder builder = new KStreamBuilder();
         builder.stream(keySerde, valueSerde, Constants.INPUT_TOPIC)
-                .filter(KafkaUtils.buildAlwaysTrueStreamPeeker(STREAMS_APP_ID)) //peek at the stream and log all msgs
+//                .filter(KafkaUtils.buildAlwaysTrueStreamPeeker(STREAMS_APP_ID)) //peek at the stream and log all msgs
                 .filter((userId, msgVal) ->
                         msgVal.getAttrValue(BasicMessageValue.KEY_LOCATION)
                                 .filter(location -> location.equals(LOCATION_1))
