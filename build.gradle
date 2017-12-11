@@ -4,9 +4,8 @@ apply plugin: 'idea'
 def gradleVer='4.3.1'
 
 repositories {
-    maven {
-        //TODO fill this in
-    }
+    mavenLocal()
+    jcenter()
 }
 
 task wrapper(type: Wrapper) {
