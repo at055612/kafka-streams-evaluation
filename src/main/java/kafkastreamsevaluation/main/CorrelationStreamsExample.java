@@ -68,7 +68,7 @@ public class CorrelationStreamsExample {
         //Start the logging consumer for both input and alert topics
         ExecutorService loggerExecutorService = KafkaUtils.startMessageLoggerConsumer(
                 GROUP_ID,
-                Arrays.asList(TOPIC_A_EVENTS, TOPIC_B_EVENTS, Constants.ALERT_TOPIC));
+                Arrays.asList(Constants.INPUT_TOPIC, TOPIC_A_EVENTS, TOPIC_B_EVENTS, Constants.ALERT_TOPIC));
 
         KafkaUtils.sleep(2_000);
 
@@ -133,7 +133,7 @@ public class CorrelationStreamsExample {
 
         KTable<String, MessageValue> bState = bEvents.reduceByKey((v1, v2) -> v2, keySerde, valueSerde, "bTable");
 
-        aState.join(bState, Tuple::of)
+        aState.outerJoin(bState, Tuple::of)
                 .mapValues(val -> {
                     LOGGER.info("\n  A: {}\n  B: {}", val._1(), val._2());
 
@@ -204,9 +204,11 @@ public class CorrelationStreamsExample {
 
         records.add(buildAEvent(baseTime.plusMinutes(offsetMins++), USER_1, STATE_IN)); //user1 in-
         records.add(buildBEvent(baseTime.plusMinutes(offsetMins++), USER_1, STATE_IN)); //user1 in-in
-        records.add(buildBEvent(baseTime.plusMinutes(offsetMins++), USER_2, STATE_OUT)); //user1 in-in
+//        records.add(buildBEvent(baseTime.plusMinutes(offsetMins++), USER_2, STATE_OUT)); //user1 in-in
         records.add(buildAEvent(baseTime.plusMinutes(offsetMins++), USER_1, STATE_OUT)); //user1 out-in
         records.add(buildBEvent(baseTime.plusMinutes(offsetMins++), USER_1, STATE_OUT)); //user1 out-out
+
+//        Collections.reverse(records);
 
         return records;
     }
