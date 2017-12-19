@@ -48,7 +48,7 @@ configurations {
 
         resolutionStrategy {
             dependencySubstitution {
-                substitute module('log4j:log4j') with module('org.slf4j:log4j-over-slf4j:$versions.slf4j')
+                substitute module('log4j:log4j') with module("org.slf4j:log4j-over-slf4j:$versions.slf4j")
             }
 
             forcedModules = [
