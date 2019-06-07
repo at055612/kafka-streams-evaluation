@@ -58,6 +58,9 @@ public class EventMatchStreamsExample {
                 Collections.singletonList(Constants.ALERT_TOPIC));
 //                Arrays.asList(Constants.INPUT_TOPIC, Constants.ALERT_TOPIC));
 
+        // give the consume and streams app a chance to fire up
+        KafkaUtils.sleep(500);
+
         //now produce some messages on the input topic, and make sure kafka has accepted them all
         try (KafkaProducer<String, String> kafkaProducer = KafkaUtils.getKafkaProducer()) {
 
@@ -97,7 +100,7 @@ public class EventMatchStreamsExample {
 
         KStreamBuilder builder = new KStreamBuilder();
         builder.stream(keySerde, valueSerde, Constants.INPUT_TOPIC)
-//                .filter(KafkaUtils.buildAlwaysTrueStreamPeeker(STREAMS_APP_ID)) //peek at the stream and log all msgs
+                .filter(KafkaUtils.buildAlwaysTrueStreamPeeker(STREAMS_APP_ID)) //peek at the stream and log all msgs
                 .filter((userId, msgVal) ->
                         msgVal.getAttrValue(BasicMessageValue.KEY_LOCATION)
                                 .filter(location -> location.equals(LOCATION_1))
