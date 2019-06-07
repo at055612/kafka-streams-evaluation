@@ -119,15 +119,16 @@ public class KafkaUtils {
 
     public static List<Future<RecordMetadata>> sendMessages(final List<ProducerRecord<String, String>> messages) {
 
-        KafkaProducer<String, String> kafkaProducer = getKafkaProducer();
+        try (KafkaProducer<String, String> kafkaProducer = KafkaUtils.getKafkaProducer()) {
 
-        List<Future<RecordMetadata>> futures = new ArrayList<>();
-        messages.forEach(msg -> {
-            futures.add(kafkaProducer.send(msg));
-        });
-        kafkaProducer.flush();
+            List<Future<RecordMetadata>> futures = new ArrayList<>();
+            messages.forEach(msg -> {
+                futures.add(kafkaProducer.send(msg));
+            });
+            kafkaProducer.flush();
 
-        return futures;
+            return futures;
+        }
     }
 
     public static KafkaConsumer<String, String> buildKafkaConsumer(final String groupId,
