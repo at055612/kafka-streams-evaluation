@@ -100,7 +100,7 @@ public class EventMatchStreamsExample {
 
         KStreamBuilder builder = new KStreamBuilder();
         builder.stream(keySerde, valueSerde, Constants.INPUT_TOPIC)
-                .filter(KafkaUtils.buildAlwaysTrueStreamPeeker(STREAMS_APP_ID)) //peek at the stream and log all msgs
+                .filter(KafkaUtils.buildAlwaysTrueStreamPeeker(STREAMS_APP_ID, String.class, MessageValue.class)) //peek at the stream and log all msgs
                 .filter((userId, msgVal) ->
                         msgVal.getAttrValue(BasicMessageValue.KEY_LOCATION)
                                 .filter(location -> location.equals(LOCATION_1))

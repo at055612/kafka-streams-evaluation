@@ -24,6 +24,7 @@ dependencies {
     compile "ch.qos.logback:logback-classic:$versions.logback"
     compile "ch.qos.logback:logback-core:$versions.logback"
     compile "com.beust:jcommander:1.72" //Apache 2.0
+    compile "com.esotericsoftware:kryo-shaded:4.0.2"
     compile "com.fasterxml.jackson.core:jackson-annotations:$versions.jackson"
     compile "com.fasterxml.jackson.core:jackson-core:$versions.jackson"
     compile "com.fasterxml.jackson.core:jackson-databind:$versions.jackson"
