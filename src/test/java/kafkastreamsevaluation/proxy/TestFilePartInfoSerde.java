@@ -1,13 +1,12 @@
 package kafkastreamsevaluation.proxy;
 
+import kafkastreamsevaluation.proxy.serde.FilePartInfoSerde;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
-
-import static org.junit.Assert.*;
 
 public class TestFilePartInfoSerde {
 

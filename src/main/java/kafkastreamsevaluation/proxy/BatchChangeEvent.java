@@ -3,7 +3,7 @@ package kafkastreamsevaluation.proxy;
 import java.util.Objects;
 import java.util.Optional;
 
-class BatchChangeEvent {
+public class BatchChangeEvent {
 
     private final ChangeType changeType;
     private final FilePartInfo filePartInfo;

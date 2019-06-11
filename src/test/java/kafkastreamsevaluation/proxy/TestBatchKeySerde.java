@@ -1,11 +1,10 @@
 package kafkastreamsevaluation.proxy;
 
+import kafkastreamsevaluation.proxy.serde.BatchKeySerde;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.junit.Assert.*;
 
 public class TestBatchKeySerde {
     private static final Logger LOGGER = LoggerFactory.getLogger(TestBatchKeySerde.class);

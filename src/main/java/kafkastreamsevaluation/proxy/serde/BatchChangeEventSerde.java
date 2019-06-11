@@ -1,24 +1,19 @@
-package kafkastreamsevaluation.proxy;
+package kafkastreamsevaluation.proxy.serde;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.pool.KryoFactory;
 import com.esotericsoftware.kryo.pool.KryoPool;
-import org.objenesis.strategy.StdInstantiatorStrategy;
+import kafkastreamsevaluation.proxy.BatchChangeEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
+public class BatchChangeEventSerde extends AbstractKafkaSerde<BatchChangeEvent> {
 
-class FilePartInfoSerde extends AbstractKafkaSerde<FilePartInfo> {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(FilePartInfoSerde.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(BatchChangeEventSerde.class);
 
 //    private static final KryoFactory factory = () -> {
 //        Kryo kryo = new Kryo();
 //        try {
+//            kryo.register(BatchChangeEvent.class);
 //            kryo.register(FilePartInfo.class);
-//            kryo.register(String.class);
 //
 //            ((Kryo.DefaultInstantiatorStrategy) kryo.getInstantiatorStrategy()).setFallbackInstantiatorStrategy(
 //                    new StdInstantiatorStrategy());
@@ -33,8 +28,8 @@ class FilePartInfoSerde extends AbstractKafkaSerde<FilePartInfo> {
 //            .softReferences()
 //            .build();
 
-    public static FilePartInfoSerde instance() {
-        return new FilePartInfoSerde();
+    public static BatchChangeEventSerde instance() {
+        return new BatchChangeEventSerde();
     }
 
     @Override

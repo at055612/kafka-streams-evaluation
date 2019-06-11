@@ -1,4 +1,4 @@
-package kafkastreamsevaluation.proxy;
+package kafkastreamsevaluation.proxy.serde;
 
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;

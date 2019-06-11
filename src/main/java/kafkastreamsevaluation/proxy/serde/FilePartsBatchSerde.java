@@ -1,16 +1,11 @@
-package kafkastreamsevaluation.proxy;
+package kafkastreamsevaluation.proxy.serde;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.pool.KryoFactory;
 import com.esotericsoftware.kryo.pool.KryoPool;
-import org.objenesis.strategy.StdInstantiatorStrategy;
+import kafkastreamsevaluation.proxy.FilePartsBatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
-
-class FilePartsBatchSerde extends AbstractKafkaSerde<FilePartsBatch> {
+public class FilePartsBatchSerde extends AbstractKafkaSerde<FilePartsBatch> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FilePartsBatchSerde.class);
 

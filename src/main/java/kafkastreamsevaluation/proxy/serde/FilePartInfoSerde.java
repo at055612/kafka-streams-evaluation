@@ -1,18 +1,19 @@
-package kafkastreamsevaluation.proxy;
+package kafkastreamsevaluation.proxy.serde;
 
 import com.esotericsoftware.kryo.pool.KryoPool;
+import kafkastreamsevaluation.proxy.FilePartInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-class BatchChangeEventSerde extends AbstractKafkaSerde<BatchChangeEvent> {
+public class FilePartInfoSerde extends AbstractKafkaSerde<FilePartInfo> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(BatchChangeEventSerde.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(FilePartInfoSerde.class);
 
 //    private static final KryoFactory factory = () -> {
 //        Kryo kryo = new Kryo();
 //        try {
-//            kryo.register(BatchChangeEvent.class);
 //            kryo.register(FilePartInfo.class);
+//            kryo.register(String.class);
 //
 //            ((Kryo.DefaultInstantiatorStrategy) kryo.getInstantiatorStrategy()).setFallbackInstantiatorStrategy(
 //                    new StdInstantiatorStrategy());
@@ -27,8 +28,8 @@ class BatchChangeEventSerde extends AbstractKafkaSerde<BatchChangeEvent> {
 //            .softReferences()
 //            .build();
 
-    public static BatchChangeEventSerde instance() {
-        return new BatchChangeEventSerde();
+    public static FilePartInfoSerde instance() {
+        return new FilePartInfoSerde();
     }
 
     @Override

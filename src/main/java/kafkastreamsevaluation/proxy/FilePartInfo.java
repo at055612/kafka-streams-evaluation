@@ -2,7 +2,7 @@ package kafkastreamsevaluation.proxy;
 
 import java.util.Objects;
 
-class FilePartInfo {
+public class FilePartInfo {
 
     private final String inputFilePath;
     private final String baseName;

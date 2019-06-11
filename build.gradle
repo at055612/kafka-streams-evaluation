@@ -30,6 +30,7 @@ dependencies {
     compile "com.fasterxml.jackson.core:jackson-databind:$versions.jackson"
     compile "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:$versions.jackson"
     compile "com.google.guava:guava:21.0"
+    compile "de.javakaffee:kryo-serializers:0.45"
     compile "io.vavr:vavr:0.9.1"
     compile "org.apache.kafka:kafka-clients:$versions.kafka"
     compile "org.apache.kafka:kafka-streams:$versions.kafka"

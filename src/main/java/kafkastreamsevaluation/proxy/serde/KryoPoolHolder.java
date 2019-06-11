@@ -1,14 +1,21 @@
-package kafkastreamsevaluation.proxy;
+package kafkastreamsevaluation.proxy.serde;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.pool.KryoFactory;
 import com.esotericsoftware.kryo.pool.KryoPool;
 import com.esotericsoftware.kryo.serializers.EnumNameSerializer;
+import de.javakaffee.kryoserializers.CollectionsEmptyListSerializer;
+import de.javakaffee.kryoserializers.CollectionsSingletonListSerializer;
+import kafkastreamsevaluation.proxy.BatchChangeEvent;
+import kafkastreamsevaluation.proxy.BatchKey;
+import kafkastreamsevaluation.proxy.FilePartInfo;
+import kafkastreamsevaluation.proxy.FilePartsBatch;
 import org.objenesis.strategy.StdInstantiatorStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 class KryoPoolHolder {
@@ -28,6 +35,10 @@ class KryoPoolHolder {
          registerEnum(kryo, FilePartsBatch.BatchState.class, 14);
          kryo.register(BatchChangeEvent.class, 15);
          registerEnum(kryo, BatchChangeEvent.ChangeType.class, 16);
+         kryo.register(BatchKey.class, 17);
+         // custom serialises to deal with private classes
+         kryo.register(Collections.EMPTY_LIST.getClass(), new CollectionsEmptyListSerializer(), 18);
+         kryo.register(Collections.singletonList("").getClass(), new CollectionsSingletonListSerializer(), 19);
 
          ((Kryo.DefaultInstantiatorStrategy) kryo.getInstantiatorStrategy()).setFallbackInstantiatorStrategy(
                  new StdInstantiatorStrategy());

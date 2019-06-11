@@ -2,7 +2,7 @@ package kafkastreamsevaluation.proxy;
 
 import java.util.Objects;
 
-class BatchKey {
+public class BatchKey {
 
     private final String feedName;
     private final long batchId;

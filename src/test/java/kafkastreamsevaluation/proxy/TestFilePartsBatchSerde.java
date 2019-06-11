@@ -1,5 +1,6 @@
 package kafkastreamsevaluation.proxy;
 
+import kafkastreamsevaluation.proxy.serde.FilePartsBatchSerde;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -32,6 +33,48 @@ public class TestFilePartsBatchSerde {
                 filePartInfo1,
                 FilePartsBatch.BatchState.INCOMPLETE)
                 .addFilePart(filePartInfo2);
+
+        byte[] bytes = serde.serialize("topic", sourceObject);
+
+        LOGGER.info("bytes length = " + bytes.length);
+
+        FilePartsBatch destObject = serde.deserialize("topic", bytes);
+
+        Assertions.assertThat(sourceObject)
+                .isEqualTo(destObject);
+    }
+
+    @Test
+    public void testSerDeser_single() {
+        FilePartsBatchSerde serde = FilePartsBatchSerde.instance();
+
+
+        FilePartInfo filePartInfo1 = new FilePartInfo(
+                "a/b/c/d.zip",
+                "001",
+                Instant.now().toEpochMilli(),
+                1024L);
+
+
+        FilePartsBatch sourceObject = new FilePartsBatch(
+                filePartInfo1,
+                FilePartsBatch.BatchState.INCOMPLETE);
+
+        byte[] bytes = serde.serialize("topic", sourceObject);
+
+        LOGGER.info("bytes length = " + bytes.length);
+
+        FilePartsBatch destObject = serde.deserialize("topic", bytes);
+
+        Assertions.assertThat(sourceObject)
+                .isEqualTo(destObject);
+    }
+
+    @Test
+    public void testSerDeser_empty() {
+        FilePartsBatchSerde serde = FilePartsBatchSerde.instance();
+
+        FilePartsBatch sourceObject = FilePartsBatch.emptyBatch();
 
         byte[] bytes = serde.serialize("topic", sourceObject);
 

@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-class FilePartsBatch {
+public class FilePartsBatch {
 
     private final BatchState batchState;
     private final long minCreationTimeMs;
