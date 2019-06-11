@@ -28,7 +28,9 @@ public class TestFilePartsBatchSerde {
                 Instant.now().toEpochMilli(),
                 2048L);
 
-        FilePartsBatch sourceObject = new FilePartsBatch(filePartInfo1, batchState)
+        FilePartsBatch sourceObject = new FilePartsBatch(
+                filePartInfo1,
+                FilePartsBatch.BatchState.INCOMPLETE)
                 .addFilePart(filePartInfo2);
 
         byte[] bytes = serde.serialize("topic", sourceObject);
