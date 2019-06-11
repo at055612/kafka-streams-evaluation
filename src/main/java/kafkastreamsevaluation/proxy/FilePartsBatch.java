@@ -1,7 +1,5 @@
 package kafkastreamsevaluation.proxy;
 
-import com.sun.org.apache.xerces.internal.xs.datatypes.ObjectList;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -9,17 +7,19 @@ import java.util.Objects;
 
 class FilePartsBatch {
 
+    private final BatchState batchState;
     private final long minCreationTimeMs;
     private final long totalSizeBytes;
     private final List<FilePartInfo> fileParts;
 
-    FilePartsBatch(final FilePartInfo filePartInfo) {
+    FilePartsBatch(final FilePartInfo filePartInfo, final BatchState batchState) {
        this.fileParts = Collections.singletonList(Objects.requireNonNull(filePartInfo));
        this.minCreationTimeMs = filePartInfo.getCreationTimeMs();
        this.totalSizeBytes = filePartInfo.getSizeBytes();
+        this.batchState = batchState;
     }
 
-    FilePartsBatch(final List<FilePartInfo> fileParts) {
+    FilePartsBatch(final List<FilePartInfo> fileParts, final BatchState batchState) {
         this.fileParts = Objects.requireNonNull(fileParts);
 
         this.minCreationTimeMs = fileParts.stream()
@@ -30,10 +30,11 @@ class FilePartsBatch {
         this.totalSizeBytes = fileParts.stream()
                 .mapToLong(FilePartInfo::getSizeBytes)
                 .sum();
+        this.batchState = batchState;
     }
 
     static FilePartsBatch emptyBatch() {
-        return new FilePartsBatch(Collections.emptyList());
+        return new FilePartsBatch(Collections.emptyList(), BatchState.INCOMPLETE);
     }
 
     FilePartsBatch addFilePart(FilePartInfo filePartInfo) {
@@ -41,7 +42,7 @@ class FilePartsBatch {
 
        List<FilePartInfo> newPartsList = new ArrayList<>(this.fileParts);
        newPartsList.add(filePartInfo);
-       return new FilePartsBatch(newPartsList);
+       return new FilePartsBatch(newPartsList, batchState);
     }
 
 
@@ -83,5 +84,10 @@ class FilePartsBatch {
                 ", totalSizeBytes=" + totalSizeBytes +
                 ", fileParts=" + fileParts +
                 '}';
+    }
+
+    public static enum BatchState {
+        COMPLETE,
+        INCOMPLETE
     }
 }

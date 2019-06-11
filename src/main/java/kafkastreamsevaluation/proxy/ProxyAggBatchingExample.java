@@ -1,7 +1,6 @@
 package kafkastreamsevaluation.proxy;
 
 import com.google.common.collect.Maps;
-import kafkastreamsevaluation.Constants;
 import kafkastreamsevaluation.util.KafkaUtils;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -14,7 +13,6 @@ import org.apache.kafka.streams.kstream.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -60,27 +58,47 @@ public class ProxyAggBatchingExample {
 
 
 
+    Mk. 2
+    -----
 
 
     InputFileTopic: inputFilePath -> null
-    PartsRefCountTopic: inputFilePath -> n (where n is the number of parts still to process)
-    FeedToPartsTopic: feedName -> inputFilePath|partBasename|datFileSize|inputFileCreateTime.
-    FeedToBatchTopic: feedName|batchId -> List<inputFilePath|partBasename>
+    PartConsumptionChangeEventsTopic: inputFilePath|partBasename -> false/true
+      -> change events for KTable of FilePartConsumptionStates
+    FeedToPartsTopic: feedName -> FilePartInfo(inputFilePath|partBasename|datFileSize|inputFileCreateTime)
+    BatchChangeEventsTopic: feedName -> BatchChangeEvent(type|FilePartInfo)
+      -> change events for KTable of FilePartsBatch
+    ForwardFileTopic: forwardFilePath -> null
 
     Stage 1 - Walk file tree finding input files that need to be processed.  Add filename to
-    InputFileTopic and mark input file as procesed (e.g. rename to xxx.zip.processed). The tree
+    InputFileTopic and mark input file as processed (e.g. rename to xxx.zip.processed). The tree
     walking would be continuous, i.e. as soon as it has walked the tree it goes back to start at
-    the top again.
+    the top again. We could skip this step if proxy just put the filename on the topic when it creates
+    the file.
 
-    Stage 2 - Consume from InputFileTopic and for each msg open the input file to extract the
-    number of parts and for each part get the dat file size and creation time. Add parts count
-    to PartsRefCounter and add each part info set to FeedToPartsTopic.
+    Stage 2 - Consume from InputFileTopic and for each msg (input file) open the input file to extract the
+    number of parts and for each part get the dat file size and creation time. For each part
+    add inputFilePath|partbasename -> false to PartConsumptionChangeEventsTopic and
+    add each part info object to FeedToPartsTopic.
 
-    Stage 3 - Consume from FeedToPartsTopic and for each part add the part to the batch of parts
-    for that feed. If the new part would make the batch exceed the max bytes then add the batch to
-    the FeedToBatchTopic, clear the batch, then add the new part. If after adding the part to the
-    batch, the part count is == to the max part count or the age of the batch (based on oldest create
-    time) is above max age threshold, then add batch to FeedToBatchTopic and clear batch.
+    Stage 3 - Outer join FeedToPartsTopic with KTable of FilePartsBatch so each file part is joined to latest
+    picture of the batch for that feed. Flat map to a list of BatchChangeEvent objects so we can mutate the
+    batch state.  If the current batch is null then map to a batch initialise event and an add for the file part.
+    If the batch is incomplete but not full map to an add for the file part. If the batch is incomplete but 'ready'
+    then map to a batch complete event and a batch initialise event and a batch add event. If the batch is complete
+    map to a batch initialise event and an add event for the part. 'Ready' is governed by age/count/size.
+
+    Stage 4 - Consume from the topic of batches (maybe we need to put completed batches to their own topic).
+    If batch is marked complete then either create a zip from the batch ready for forwarding (and add details
+    of the new zip to ForwardFileTopic) or write to the stream
+    store.  Add inputFilePath|partbasename -> true for each part in the batch to indicate the parts in the
+    input files are no longer needed.
+
+    Stage 5 Consume from the KTable of FilePartConsumptionStates and whenever we get one where all parts are
+    true, delete the corresponding input file.
+
+
+
 
     Thoughts:
 
@@ -91,7 +109,10 @@ public class ProxyAggBatchingExample {
 
     1. Need a way of identifying batches that have reach max age without relying on the consumption of
     new parts as a trigger.  Would need some kind of delay queue to process a batch if it hasn't already
-    been processed due to another limit being reached.
+    been processed due to another limit being reached.  It may be possible to add initialised batches to
+    another topic where the message time is set to the max age of the batch.  Then another process can
+    regularly try to consume from the topic from the current time onwards rather than from an offset.  See
+    https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=65868090
 
     1. Rather than constantly walking the tree we could maybe use inotify to watch for changes, however
     we have a very deep tree and I am not sure if we would need one watcher per dir.
@@ -177,15 +198,15 @@ public class ProxyAggBatchingExample {
 
         builder.stream(feedNameSerde, filePartInfoSerde, FEED_TO_PARTS_TOPIC)
                 .filter(filePartInfoPeeker) //peek at the stream and log all msgs
-                .aggregateByKey(
-                        FilePartsBatch::emptyBatch,
-                        (aggKey, value, aggregate) ->
-                                aggregate.addFilePart(value),
-                        feedNameSerde,
-                        filePartsBatchSerde,
-                        "FilePartsBatchKTable"
-                )
-                .to(FEED_TO_BATCH_TOPIC);
+//                .aggregateByKey(
+//                        FilePartsBatch::emptyBatch,
+//                        (aggKey, value, aggregate) ->
+//                                aggregate.addFilePart(value),
+//                        feedNameSerde,
+//                        filePartsBatchSerde,
+//                        "FilePartsBatchKTable"
+//                )
+                .to(feedNameSerde, filePartInfoSerde, FEED_TO_BATCH_TOPIC);
 
         final KafkaStreams kafkaStreams = new KafkaStreams(builder, streamsConfig);
         kafkaStreams.setUncaughtExceptionHandler(KafkaUtils.buildUncaughtExceptionHandler(STREAMS_APP_ID));
