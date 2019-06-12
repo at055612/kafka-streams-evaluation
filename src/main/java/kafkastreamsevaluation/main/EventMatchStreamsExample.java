@@ -2,6 +2,8 @@ package kafkastreamsevaluation.main;
 
 import com.google.common.collect.Maps;
 import kafkastreamsevaluation.Constants;
+import kafkastreamsevaluation.model.BasicMessageValue;
+import kafkastreamsevaluation.model.MessageValue;
 import kafkastreamsevaluation.util.KafkaUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -9,12 +11,12 @@ import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
-import org.apache.kafka.streams.kstream.KStreamBuilder;
+import org.apache.kafka.streams.kstream.Consumed;
+import org.apache.kafka.streams.kstream.Produced;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import kafkastreamsevaluation.model.BasicMessageValue;
-import kafkastreamsevaluation.model.MessageValue;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -24,7 +26,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 public class EventMatchStreamsExample {
@@ -59,7 +64,7 @@ public class EventMatchStreamsExample {
 //                Arrays.asList(Constants.INPUT_TOPIC, Constants.ALERT_TOPIC));
 
         // give the consume and streams app a chance to fire up
-        KafkaUtils.sleep(500);
+        KafkaUtils.sleep(2_000);
 
         //now produce some messages on the input topic, and make sure kafka has accepted them all
         try (KafkaProducer<String, String> kafkaProducer = KafkaUtils.getKafkaProducer()) {
@@ -98,16 +103,17 @@ public class EventMatchStreamsExample {
         Serde<String> keySerde = Serdes.String();
         Serde<MessageValue> valueSerde = MessageValue.serde();
 
-        KStreamBuilder builder = new KStreamBuilder();
-        builder.stream(keySerde, valueSerde, Constants.INPUT_TOPIC)
-                .filter(KafkaUtils.buildAlwaysTrueStreamPeeker(STREAMS_APP_ID, String.class, MessageValue.class)) //peek at the stream and log all msgs
+        StreamsBuilder builder = new StreamsBuilder();
+        builder
+                .stream(Constants.INPUT_TOPIC, Consumed.with(keySerde, valueSerde))
+                .peek(KafkaUtils.buildLoggingStreamPeeker(STREAMS_APP_ID, String.class, MessageValue.class)) //peek at the stream and log all msgs
                 .filter((userId, msgVal) ->
                         msgVal.getAttrValue(BasicMessageValue.KEY_LOCATION)
                                 .filter(location -> location.equals(LOCATION_1))
                                 .isPresent()) //filter on a single attr in the object
-                .to(keySerde, valueSerde, Constants.ALERT_TOPIC);
+                .to(Constants.ALERT_TOPIC, Produced.with(keySerde, valueSerde));
 
-        final KafkaStreams kafkaStreams = new KafkaStreams(builder, streamsConfig);
+        final KafkaStreams kafkaStreams = new KafkaStreams(builder.build(), streamsConfig);
         kafkaStreams.setUncaughtExceptionHandler(KafkaUtils.buildUncaughtExceptionHandler(STREAMS_APP_ID));
 
         //Start the stream processing in a new thread

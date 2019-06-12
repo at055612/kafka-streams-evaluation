@@ -14,10 +14,15 @@ import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.KStreamBuilder;
 import org.apache.kafka.streams.kstream.KTable;
+import org.apache.kafka.streams.kstream.Materialized;
+import org.apache.kafka.streams.kstream.Produced;
+import org.apache.kafka.streams.kstream.Serialized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,15 +112,21 @@ public class CorrelationStreamsExample {
 
         final StreamsConfig streamsConfig = KafkaUtils.buildStreamsConfig(
                 STREAMS_APP_ID,
-                Maps.immutableEntry(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 2),
-                Maps.immutableEntry(StreamsConfig.TIMESTAMP_EXTRACTOR_CLASS_CONFIG,
-                        MessageValueTimestampExtractor.class.getName())); //use event time for processing
+                Maps.immutableEntry(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 2));
+//                Maps.immutableEntry(StreamsConfig.TIMESTAMP_EXTRACTOR_CLASS_CONFIG,
+//                        MessageValueTimestampExtractor.class.getName())); //use event time for processing
 
         Serde<String> keySerde = Serdes.String();
         Serde<MessageValue> valueSerde = MessageValue.serde();
 
-        KStreamBuilder builder = new KStreamBuilder();
-        KStream<String, MessageValue> allEvents = builder.stream(keySerde, valueSerde, Constants.INPUT_TOPIC);
+        StreamsBuilder builder = new StreamsBuilder();
+        KStream<String, MessageValue> allEvents = builder.stream(
+                Constants.INPUT_TOPIC,
+                Consumed.with(
+                        keySerde,
+                        valueSerde,
+                        new MessageValueTimestampExtractor(),
+                        Topology.AutoOffsetReset.LATEST));
 
         KStream<String, MessageValue> aEvents = allEvents
                 .filter((userId, msgVal) ->
@@ -123,7 +134,9 @@ public class CorrelationStreamsExample {
                                 .filter(eventType -> eventType.equals(EVENT_TYPE_A))
                                 .isPresent());
 
-        KTable<String, MessageValue> aState = aEvents.reduceByKey((v1, v2) -> v2, keySerde, valueSerde, "aTable");
+        KTable<String, MessageValue> aState = aEvents
+                .groupByKey(Serialized.with(keySerde, valueSerde))
+                .reduce((v1, v2) -> v2, Materialized.as("aTable"));
 
         KStream<String, MessageValue> bEvents = allEvents
                 .filter((userId, msgVal) ->
@@ -131,7 +144,9 @@ public class CorrelationStreamsExample {
                                 .filter(eventType -> eventType.equals(EVENT_TYPE_B))
                                 .isPresent());
 
-        KTable<String, MessageValue> bState = bEvents.reduceByKey((v1, v2) -> v2, keySerde, valueSerde, "bTable");
+        KTable<String, MessageValue> bState = bEvents
+                .groupByKey(Serialized.with(keySerde, valueSerde))
+                .reduce((v1, v2) -> v2, Materialized.as("bTable"));
 
         aState.outerJoin(bState, Tuple::of)
                 .mapValues(val -> {
@@ -144,7 +159,7 @@ public class CorrelationStreamsExample {
                         Arrays.asList(val._1(), val._2()));
                 })
                 .toStream()
-                .to(keySerde, valueSerde, Constants.ALERT_TOPIC);
+                .to(Constants.ALERT_TOPIC, Produced.with(keySerde, valueSerde));
 
 
 //        KStreamBuilder builderA = new KStreamBuilder();
@@ -183,7 +198,7 @@ public class CorrelationStreamsExample {
 //                .to(keySerde, valueSerde, Constants.ALERT_TOPIC);
 
 
-        final KafkaStreams kafkaStreams = new KafkaStreams(builder, streamsConfig);
+        final KafkaStreams kafkaStreams = new KafkaStreams(builder.build(), streamsConfig);
         kafkaStreams.setUncaughtExceptionHandler(KafkaUtils.buildUncaughtExceptionHandler(STREAMS_APP_ID));
 
         //Start the stream processing in a new thread

@@ -11,11 +11,13 @@ import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.KStreamBuilder;
 import org.apache.kafka.streams.kstream.KTable;
 import org.apache.kafka.streams.kstream.Predicate;
+import org.apache.kafka.streams.kstream.Produced;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -142,6 +144,13 @@ public class ProxyAggBatchingExample {
     1. For the left join to work the two topics MUST have identical partition counts and data must be fed
     to them with identical partitioning schemes (i.e. hashing of the key).
 
+
+
+    kcreate FeedToBatchTopic; kconsume FeedToBatchTopic
+    topic="CompletedBatchTopic"; kcreate $topic; kconsume $topic
+    kcreate FeedToPartsTopic; kconsume FeedToPartsTopic
+
+
      */
 
 
@@ -204,7 +213,7 @@ public class ProxyAggBatchingExample {
         });
 
         //sleep so we can wait for the alerts to appear in the console
-        KafkaUtils.sleep(20_000);
+        KafkaUtils.sleep(2000_000);
 
         batchCreationKafkaStreams.close();
         batchCreationExecutorService.shutdownNow();
@@ -229,13 +238,13 @@ public class ProxyAggBatchingExample {
         Predicate<String, FilePartInfo> filePartInfoPeeker = KafkaUtils.buildAlwaysTrueStreamPeeker(
                 BATCH_CREATION_APP_ID, String.class, FilePartInfo.class);
 
-        KStreamBuilder builder = new KStreamBuilder();
+        StreamsBuilder builder = new StreamsBuilder();
 
         KStream<String, FilePartInfo> filePartInfoStream = builder
-                .stream(feedNameSerde, filePartInfoSerde, FEED_TO_PARTS_TOPIC);
+                .stream(FEED_TO_PARTS_TOPIC, Consumed.with(feedNameSerde, filePartInfoSerde));
 
         KTable<String, FilePartsBatch> feedToBatchTable = builder
-                .table(feedNameSerde, filePartsBatchSerde, FEED_TO_BATCH_TOPIC);
+                .table(FEED_TO_BATCH_TOPIC, Consumed.with(feedNameSerde, filePartsBatchSerde));
 
         Predicate<String, FilePartsBatch> batchIsCompletePredicate = (feedName, filePartsBatch) ->
                 filePartsBatch.isComplete();
@@ -282,22 +291,23 @@ public class ProxyAggBatchingExample {
                     if (outputBatchChangeLog.size() > 2 || outputBatchChangeLog.size() < 1) {
                         throw new RuntimeException("Not expecting more that 2 or less than 1 batch objects here");
                     }
-//                    KafkaUtils.sleep(10_000);
+                    KafkaUtils.sleep(10_000);
                     LOGGER.debug("Outputting {} batches, {}", outputBatchChangeLog.size(),
                             outputBatchChangeLog.stream()
                                 .map(filePartsBatch -> String.valueOf(filePartsBatch.getFilePartsCount()))
                                 .collect(Collectors.joining(",")));
                     return outputBatchChangeLog;
                 })
+                .peek(KafkaUtils.buildLoggingStreamPeeker(BATCH_CREATION_APP_ID, String.class, FilePartsBatch.class))
                 .branch(batchIsCompletePredicate, acceptAllPredicate); // branch to avoid losing batch in compaction
 
         // Any completed batches
         branchedStreams[0]
-                .to(feedNameSerde, filePartsBatchSerde, COMPLETED_BATCH_TOPIC);
+                .to(COMPLETED_BATCH_TOPIC, Produced.with(feedNameSerde, filePartsBatchSerde));
 
         // Any in-complete batches
         branchedStreams[1]
-                .to(feedNameSerde, filePartsBatchSerde, FEED_TO_BATCH_TOPIC);
+                .to(FEED_TO_BATCH_TOPIC, Produced.with(feedNameSerde, filePartsBatchSerde));
 
 
 //                .foreach((key, value) -> {
@@ -314,7 +324,7 @@ public class ProxyAggBatchingExample {
 //                )
 //                .to(feedNameSerde, filePartInfoSerde, FEED_TO_BATCH_TOPIC);
 
-        final KafkaStreams kafkaStreams = new KafkaStreams(builder, streamsConfig);
+        final KafkaStreams kafkaStreams = new KafkaStreams(builder.build(), streamsConfig);
         kafkaStreams.setUncaughtExceptionHandler(KafkaUtils.buildUncaughtExceptionHandler(BATCH_CREATION_APP_ID));
 
         //Start the stream processing in a new thread
@@ -336,10 +346,10 @@ public class ProxyAggBatchingExample {
         Predicate<String, FilePartsBatch> filePartInfoPeeker = KafkaUtils.buildAlwaysTrueStreamPeeker(
                 BATCH_CONSUMPTION_APP_ID, String.class, FilePartsBatch.class);
 
-        KStreamBuilder builder = new KStreamBuilder();
+        StreamsBuilder builder = new StreamsBuilder();
 
         KStream<String, FilePartsBatch> feedToBatchStream = builder
-                .stream(feedNameSerde, filePartsBatchSerde, COMPLETED_BATCH_TOPIC);
+                .stream(COMPLETED_BATCH_TOPIC, Consumed.with(feedNameSerde, filePartsBatchSerde));
 
         feedToBatchStream
                 .filter(filePartInfoPeeker) //peek at the stream and log all msgs
@@ -348,7 +358,7 @@ public class ProxyAggBatchingExample {
                     LOGGER.debug("Consuming completed batch {}: {}", feedName, filePartsBatch);
                 });
 
-        final KafkaStreams kafkaStreams = new KafkaStreams(builder, streamsConfig);
+        final KafkaStreams kafkaStreams = new KafkaStreams(builder.build(), streamsConfig);
         kafkaStreams.setUncaughtExceptionHandler(KafkaUtils.buildUncaughtExceptionHandler(BATCH_CONSUMPTION_APP_ID));
 
         //Start the stream processing in a new thread

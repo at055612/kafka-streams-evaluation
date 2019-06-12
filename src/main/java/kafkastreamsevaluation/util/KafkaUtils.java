@@ -11,6 +11,7 @@ import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.kstream.ForeachAction;
 import org.apache.kafka.streams.kstream.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,7 +100,7 @@ public class KafkaUtils {
 
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BOOTSTRAP_SERVERS);
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, appId);
-        props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, KAFKA_ZOOKEEPER_QUORUM);
+//        props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, KAFKA_ZOOKEEPER_QUORUM);
         props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 1_000);
 
         //latest = when the consumer starts for the first time, grab the latest offset
@@ -358,6 +359,17 @@ public class KafkaUtils {
             //abuse of a predicate as a peek method on the stream, so always return true so the
             //steam is not mutated
             return true;
+        };
+    }
+
+    public static <K,V> ForeachAction<K, V> buildLoggingStreamPeeker(final String appId,
+                                                                     final Class<K> keyType,
+                                                                     final Class<V> valueType) {
+        return (k, v) -> {
+            LOGGER.info("Seen message in stream - \n  appId = {}\n  key = {}\n  value = {}",
+                    appId, k.toString(), v.toString());
+            //abuse of a predicate as a peek method on the stream, so always return true so the
+            //steam is not mutated
         };
     }
 

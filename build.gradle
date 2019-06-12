@@ -16,7 +16,8 @@ ext.versions = [
     slf4j: '1.7.24', 
     logback: '1.2.1', 
     jackson: '2.8.9', 
-    kafka: '0.10.0.1', //CDH5.11 uses kafka 0.10.0+kafka2.1
+    //kafka: '0.10.0.1', //CDH5.11 uses kafka 0.10.0+kafka2.1
+    kafka: '2.0.0', //CDH6.1 uses kafka 2.0.0
 ]
 // In this section you declare the dependencies for your production and test code
 dependencies {
