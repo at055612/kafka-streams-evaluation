@@ -19,25 +19,30 @@ import org.apache.kafka.streams.kstream.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
 
 public class ProxyAggBatchingExample {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ProxyAggBatchingExample.class);
 
     private static final String GROUP_ID = ProxyAggBatchingExample.class.getSimpleName() + "-consumer";
-    private static final String STREAMS_APP_ID = ProxyAggBatchingExample.class.getSimpleName() + "-streamsApp";
+    private static final String BATCH_CREATION_APP_ID = ProxyAggBatchingExample.class.getSimpleName() + "-batchCreation";
+    private static final String BATCH_CONSUMPTION_APP_ID = ProxyAggBatchingExample.class.getSimpleName() + "-batchConsumption";
 
     private static final String FEED_TO_PARTS_TOPIC = "FeedToPartsTopic";
     private static final String FEED_TO_BATCH_TOPIC = "FeedToBatchTopic";
+    private static final String COMPLETED_BATCH_TOPIC = "CompletedBatchTopic";
     private static final String BATCH_CHANGE_EVENTS_TOPIC = "BatchChangeEventsTopic";
 
     /*
@@ -134,6 +139,9 @@ public class ProxyAggBatchingExample {
     provide increased resilience if the proxy couldn't connect to the shared storage or kafka it would write
     the files to local disk until connectivity was resumed.
 
+    1. For the left join to work the two topics MUST have identical partition counts and data must be fed
+    to them with identical partitioning schemes (i.e. hashing of the key).
+
      */
 
 
@@ -142,37 +150,41 @@ public class ProxyAggBatchingExample {
         LOGGER.info("main called with args [{}]",
                 String.join(" ", args));
         LOGGER.info("GroupId: [{}]", GROUP_ID);
-        LOGGER.info("Streams AppId: [{}]", STREAMS_APP_ID);
-
-        //Start the stream processing
-        ExecutorService streamProcessingExecutorService = Executors.newSingleThreadExecutor();
-        KafkaStreams kafkaStreams = startStreamProcessing(streamProcessingExecutorService);
-
-        //Start the logging consumer for both input and alert topics
-        ExecutorService loggerExecutorService = KafkaUtils.startMessageLoggerConsumer(
-                GROUP_ID,
-                Arrays.asList(FEED_TO_PARTS_TOPIC, FEED_TO_BATCH_TOPIC));
-//                Collections.singletonList(Constants.ALERT_TOPIC));
-
-        // give the consumer and streams app a chance to fire up before producing events
-        KafkaUtils.sleep(1000);
-
-        //now produce some messages on the input topic, and make sure kafka has accepted them all
 
         Serde<String> feedNameSerde = Serdes.String();
         Serde<FilePartInfo> filePartInfoSerde = FilePartInfoSerde.instance();
         Serde<FilePartsBatch> filePartsBatchSerde = FilePartsBatchSerde.instance();
 
-        List<Future<RecordMetadata>> emptyBatchFutures = KafkaUtils.sendMessages(
-                buildFilePartsBatchInputRecords(), feedNameSerde, filePartsBatchSerde);
+        //Start the stream processing for batch creation
+        ExecutorService batchCreationExecutorService = Executors.newSingleThreadExecutor();
+        KafkaStreams batchCreationKafkaStreams = startBatchCreationStreamProcessing(batchCreationExecutorService);
 
-        emptyBatchFutures.forEach(future -> {
-            try {
-                future.get();
-            } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException(e);
-            }
-        });
+        ExecutorService batchConsumptionExecutorService = Executors.newSingleThreadExecutor();
+        KafkaStreams batchConsumptionKafkaStreams = startBatchConsumptionStreamProcessing(batchConsumptionExecutorService);
+
+        //Start the logging consumer for both input and alert topics
+        ExecutorService loggerExecutorService = KafkaUtils.startMessageLoggerConsumer(
+                GROUP_ID,
+                Arrays.asList(FEED_TO_BATCH_TOPIC),
+                Serdes.String(),
+                filePartsBatchSerde);
+
+        // give the consumer and streams app a chance to fire up before producing events
+        KafkaUtils.sleep(2_000);
+
+        //now produce some messages on the input topic, and make sure kafka has accepted them all
+
+
+//        List<Future<RecordMetadata>> emptyBatchFutures = KafkaUtils.sendMessages(
+//                buildFilePartsBatchInputRecords(), feedNameSerde, filePartsBatchSerde);
+//
+//        emptyBatchFutures.forEach(future -> {
+//            try {
+//                future.get();
+//            } catch (InterruptedException | ExecutionException e) {
+//                throw new RuntimeException(e);
+//            }
+//        });
 
         List<Future<RecordMetadata>> futures = KafkaUtils.sendMessages(
                 buildFilePartInfoInputRecords(), feedNameSerde, filePartInfoSerde);
@@ -192,17 +204,21 @@ public class ProxyAggBatchingExample {
         });
 
         //sleep so we can wait for the alerts to appear in the console
-        KafkaUtils.sleep(10_000);
+        KafkaUtils.sleep(20_000);
 
-        kafkaStreams.close();
-        streamProcessingExecutorService.shutdownNow();
+        batchCreationKafkaStreams.close();
+        batchCreationExecutorService.shutdownNow();
+
+        batchConsumptionKafkaStreams.close();
+        batchConsumptionExecutorService.shutdownNow();
+
         loggerExecutorService.shutdownNow();
     }
 
-    private static KafkaStreams startStreamProcessing(ExecutorService executorService) {
+    private static KafkaStreams startBatchCreationStreamProcessing(ExecutorService executorService) {
 
         final StreamsConfig streamsConfig = KafkaUtils.buildStreamsConfig(
-                STREAMS_APP_ID,
+                BATCH_CREATION_APP_ID,
                 Maps.immutableEntry(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 1));
 
         Serde<String> feedNameSerde = Serdes.String();
@@ -211,7 +227,7 @@ public class ProxyAggBatchingExample {
         Serde<FilePartsBatch> filePartsBatchSerde = FilePartsBatchSerde.instance();
 
         Predicate<String, FilePartInfo> filePartInfoPeeker = KafkaUtils.buildAlwaysTrueStreamPeeker(
-                STREAMS_APP_ID, String.class, FilePartInfo.class);
+                BATCH_CREATION_APP_ID, String.class, FilePartInfo.class);
 
         KStreamBuilder builder = new KStreamBuilder();
 
@@ -221,34 +237,73 @@ public class ProxyAggBatchingExample {
         KTable<String, FilePartsBatch> feedToBatchTable = builder
                 .table(feedNameSerde, filePartsBatchSerde, FEED_TO_BATCH_TOPIC);
 
-        filePartInfoStream
-                .filter(filePartInfoPeeker) //peek at the stream and log all msgs
+        Predicate<String, FilePartsBatch> batchIsCompletePredicate = (feedName, filePartsBatch) ->
+                filePartsBatch.isComplete();
+        Predicate<String, FilePartsBatch> acceptAllPredicate = (feedName, filePartsBatch) -> true;
+
+//        Predicate[] branchPredicates = new Predicate[]{batchIsCompletePredicate, acceptAllPredicate};
+
+
+        @SuppressWarnings("unchecked")
+        KStream<String, FilePartsBatch>[] branchedStreams = filePartInfoStream
+//                .filter(filePartInfoPeeker) //peek at the stream and log all msgs
                 .leftJoin(feedToBatchTable, Tuple2::new)
                 .flatMapValues(tuple2 -> {
                     FilePartInfo filePartInfo = tuple2._1();
                     FilePartsBatch currentBatch = tuple2._2();
+                    LOGGER.debug("Seen in join filePart: {}, batch size: {}", filePartInfo.getBaseName(),
+                            currentBatch == null ? "-" : currentBatch.getFilePartsCount());
                     List<FilePartsBatch> outputBatchChangeLog = new ArrayList<>();
 
                     if (currentBatch == null) {
                         // no batch for this feed so create one
-                        FilePartsBatch newBatch = new FilePartsBatch(
-                                filePartInfo, FilePartsBatch.BatchState.INCOMPLETE);
+                        FilePartsBatch newBatch = new FilePartsBatch( filePartInfo, false);
+                        // TODO need to test for readiness after adding.
                         outputBatchChangeLog.add(newBatch);
-                        LOGGER.debug("Created new batch");
+                        LOGGER.debug("Created new batch, count: " + newBatch.getFilePartsCount());
                     } else {
-                        FilePartsBatch updatedBatch = currentBatch.addFilePart(filePartInfo);
-                        outputBatchChangeLog.add(updatedBatch);
-                        LOGGER.debug("Added to existing batch, new count: " + updatedBatch.getFilePartsCount());
+                        if (isBatchReady(currentBatch)) {
+                            FilePartsBatch completedBatch = currentBatch.completeBatch();
+                            LOGGER.debug("Completing existing batch, current count: " + currentBatch.getFilePartsCount());
+                            // TODO need to test for readiness after adding.
+                            FilePartsBatch newBatch = new FilePartsBatch(filePartInfo, false);
+                            outputBatchChangeLog.add(completedBatch);
+                            outputBatchChangeLog.add(newBatch);
+                            LOGGER.debug("Created new batch, count: " + newBatch.getFilePartsCount());
+                        } else {
+                            FilePartsBatch updatedBatch = currentBatch.addFilePart(filePartInfo);
+                            LOGGER.debug("Added to existing batch, new count: " + updatedBatch.getFilePartsCount());
+                            outputBatchChangeLog.add(updatedBatch);
+
+                        }
                         // we already have a batch so test its readiness. If ready
                         // complete it, null it then , else add to it.
                     }
+                    if (outputBatchChangeLog.size() > 2 || outputBatchChangeLog.size() < 1) {
+                        throw new RuntimeException("Not expecting more that 2 or less than 1 batch objects here");
+                    }
+//                    KafkaUtils.sleep(10_000);
+                    LOGGER.debug("Outputting {} batches, {}", outputBatchChangeLog.size(),
+                            outputBatchChangeLog.stream()
+                                .map(filePartsBatch -> String.valueOf(filePartsBatch.getFilePartsCount()))
+                                .collect(Collectors.joining(",")));
                     return outputBatchChangeLog;
                 })
-//                .to(feedNameSerde, filePartsBatchSerde, FEED_TO_BATCH_TOPIC);
-                .foreach((key, value) -> {
-                    System.out.println(key + " - " + value);
+                .branch(batchIsCompletePredicate, acceptAllPredicate); // branch to avoid losing batch in compaction
 
-                });
+        // Any completed batches
+        branchedStreams[0]
+                .to(feedNameSerde, filePartsBatchSerde, COMPLETED_BATCH_TOPIC);
+
+        // Any in-complete batches
+        branchedStreams[1]
+                .to(feedNameSerde, filePartsBatchSerde, FEED_TO_BATCH_TOPIC);
+
+
+//                .foreach((key, value) -> {
+//                    System.out.println(key + " - " + value);
+//
+//                });
 //                .aggregateByKey(
 //                        FilePartsBatch::emptyBatch,
 //                        (aggKey, value, aggregate) ->
@@ -260,7 +315,7 @@ public class ProxyAggBatchingExample {
 //                .to(feedNameSerde, filePartInfoSerde, FEED_TO_BATCH_TOPIC);
 
         final KafkaStreams kafkaStreams = new KafkaStreams(builder, streamsConfig);
-        kafkaStreams.setUncaughtExceptionHandler(KafkaUtils.buildUncaughtExceptionHandler(STREAMS_APP_ID));
+        kafkaStreams.setUncaughtExceptionHandler(KafkaUtils.buildUncaughtExceptionHandler(BATCH_CREATION_APP_ID));
 
         //Start the stream processing in a new thread
         executorService.submit(kafkaStreams::start);
@@ -269,9 +324,61 @@ public class ProxyAggBatchingExample {
         return kafkaStreams;
     }
 
+    private static KafkaStreams startBatchConsumptionStreamProcessing(ExecutorService executorService) {
+
+        final StreamsConfig streamsConfig = KafkaUtils.buildStreamsConfig(
+                BATCH_CONSUMPTION_APP_ID,
+                Maps.immutableEntry(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 1));
+
+        Serde<String> feedNameSerde = Serdes.String();
+        Serde<FilePartsBatch> filePartsBatchSerde = FilePartsBatchSerde.instance();
+
+        Predicate<String, FilePartsBatch> filePartInfoPeeker = KafkaUtils.buildAlwaysTrueStreamPeeker(
+                BATCH_CONSUMPTION_APP_ID, String.class, FilePartsBatch.class);
+
+        KStreamBuilder builder = new KStreamBuilder();
+
+        KStream<String, FilePartsBatch> feedToBatchStream = builder
+                .stream(feedNameSerde, filePartsBatchSerde, COMPLETED_BATCH_TOPIC);
+
+        feedToBatchStream
+                .filter(filePartInfoPeeker) //peek at the stream and log all msgs
+                .filter((feedName, filePartsBatch) -> filePartsBatch.isComplete())
+                .foreach((feedName, filePartsBatch) -> {
+                    LOGGER.debug("Consuming completed batch {}: {}", feedName, filePartsBatch);
+                });
+
+        final KafkaStreams kafkaStreams = new KafkaStreams(builder, streamsConfig);
+        kafkaStreams.setUncaughtExceptionHandler(KafkaUtils.buildUncaughtExceptionHandler(BATCH_CONSUMPTION_APP_ID));
+
+        //Start the stream processing in a new thread
+        executorService.submit(kafkaStreams::start);
+
+        //return the KafkaStreams so it can be shut down if needs be
+        return kafkaStreams;
+    }
+
+    private static boolean isBatchReady(final FilePartsBatch filePartsBatch) {
+        Objects.requireNonNull(filePartsBatch);
+        int maxFileParts = 3;
+        long maxAgeMs = Duration.ofDays(100).toMillis();
+        long maxSizeBytes = 10_000;
+        if (filePartsBatch.getFilePartsCount() >= maxFileParts) {
+            LOGGER.debug("Part count {} has reached its limit {}", filePartsBatch.getFilePartsCount(), maxFileParts);
+            return true;
+        } else if (filePartsBatch.getAgeMs() >= maxAgeMs) {
+            LOGGER.debug("AgeMs {} has reached its limit {}", filePartsBatch.getAgeMs(), maxAgeMs);
+            return true;
+        } else if (filePartsBatch.getTotalSizeBytes() >= maxSizeBytes) {
+            LOGGER.debug("TotalSizeBytes {} has reached its limit {}", filePartsBatch.getTotalSizeBytes(), maxSizeBytes);
+            return true;
+        }
+        return false;
+    }
+
     private static List<ProducerRecord<String, FilePartInfo>> buildFilePartInfoInputRecords() {
         ZonedDateTime baseTime = ZonedDateTime.of(
-                2017, 11, 30,
+                2019, 6, 30,
                 10, 0, 0, 0,
                 ZoneOffset.UTC);
 
@@ -280,14 +387,14 @@ public class ProxyAggBatchingExample {
         long offsetMins = 1;
 
         for (int i = 0; i < 4; i++) {
+            final String feedName = "FEED_" + i % 1;
             final long createTimeMs = baseTime.plusMinutes(offsetMins * i).toInstant().toEpochMilli();
             final FilePartInfo filePartInfo = new FilePartInfo(
-                    "/some/path/" + i + ".zip",
+                    "/some/path/" + feedName + "_" + i + ".zip",
                     "" + i,
                     createTimeMs,
                     i + 1000);
 
-            String feedName = "FEED_" + i % 2;
             ProducerRecord<String, FilePartInfo> producerRecord = new ProducerRecord<>(
                     FEED_TO_PARTS_TOPIC,
                     feedName,
@@ -298,21 +405,21 @@ public class ProxyAggBatchingExample {
         return records;
     }
 
-    private static List<ProducerRecord<String, FilePartsBatch>> buildFilePartsBatchInputRecords() {
-
-        List<ProducerRecord<String, FilePartsBatch>> records = new ArrayList<>();
-
-        long offsetMins = 1;
-
-        for (int i = 0; i < 2; i++) {
-            String feedName = "FEED_" + i % 2;
-            ProducerRecord<String, FilePartsBatch> producerRecord = new ProducerRecord<>(
-                    FEED_TO_BATCH_TOPIC,
-                    "FEED_1",
-                    FilePartsBatch.emptyBatch());
-            records.add(producerRecord);
-        }
-
-        return records;
-    }
+//    private static List<ProducerRecord<String, FilePartsBatch>> buildFilePartsBatchInputRecords() {
+//
+//        List<ProducerRecord<String, FilePartsBatch>> records = new ArrayList<>();
+//
+//        long offsetMins = 1;
+//
+//        for (int i = 0; i < 2; i++) {
+//            String feedName = "FEED_" + i % 2;
+//            ProducerRecord<String, FilePartsBatch> producerRecord = new ProducerRecord<>(
+//                    FEED_TO_BATCH_TOPIC,
+//                    "FEED_1",
+//                    FilePartsBatch.emptyBatch());
+//            records.add(producerRecord);
+//        }
+//
+//        return records;
+//    }
 }

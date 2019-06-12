@@ -31,7 +31,7 @@ public class TestFilePartsBatchSerde {
 
         FilePartsBatch sourceObject = new FilePartsBatch(
                 filePartInfo1,
-                FilePartsBatch.BatchState.INCOMPLETE)
+                false)
                 .addFilePart(filePartInfo2);
 
         byte[] bytes = serde.serialize("topic", sourceObject);
@@ -58,7 +58,7 @@ public class TestFilePartsBatchSerde {
 
         FilePartsBatch sourceObject = new FilePartsBatch(
                 filePartInfo1,
-                FilePartsBatch.BatchState.INCOMPLETE);
+                false);
 
         byte[] bytes = serde.serialize("topic", sourceObject);
 

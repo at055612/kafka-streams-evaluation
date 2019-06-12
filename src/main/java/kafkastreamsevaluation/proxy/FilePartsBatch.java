@@ -7,20 +7,20 @@ import java.util.Objects;
 
 public class FilePartsBatch {
 
-    private final BatchState batchState;
+    private final boolean isComplete;
     private final long minCreationTimeMs;
     private final long totalSizeBytes;
     private final List<FilePartInfo> fileParts;
 
-    FilePartsBatch(final FilePartInfo filePartInfo, final BatchState batchState) {
-       this.fileParts = Collections.singletonList(Objects.requireNonNull(filePartInfo));
-       this.minCreationTimeMs = filePartInfo.getCreationTimeMs();
-       this.totalSizeBytes = filePartInfo.getSizeBytes();
-        this.batchState = batchState;
+    FilePartsBatch(final FilePartInfo filePartInfo, final boolean isComplete) {
+        this.fileParts = Collections.singletonList(Objects.requireNonNull(filePartInfo));
+        this.minCreationTimeMs = filePartInfo.getCreationTimeMs();
+        this.totalSizeBytes = filePartInfo.getSizeBytes();
+        this.isComplete = isComplete;
     }
 
-    FilePartsBatch(final List<FilePartInfo> fileParts, final BatchState batchState) {
-        this.fileParts = Objects.requireNonNull(fileParts);
+    FilePartsBatch(final List<FilePartInfo> fileParts, final boolean isComplete) {
+        this.fileParts = new ArrayList<>(Objects.requireNonNull(fileParts));
 
         this.minCreationTimeMs = fileParts.stream()
                 .mapToLong(FilePartInfo::getCreationTimeMs)
@@ -30,11 +30,11 @@ public class FilePartsBatch {
         this.totalSizeBytes = fileParts.stream()
                 .mapToLong(FilePartInfo::getSizeBytes)
                 .sum();
-        this.batchState = batchState;
+        this.isComplete = isComplete;
     }
 
     static FilePartsBatch emptyBatch() {
-        return new FilePartsBatch(Collections.emptyList(), BatchState.INCOMPLETE);
+        return new FilePartsBatch(Collections.emptyList(), false);
     }
 
     FilePartsBatch addFilePart(FilePartInfo filePartInfo) {
@@ -42,12 +42,23 @@ public class FilePartsBatch {
 
        List<FilePartInfo> newPartsList = new ArrayList<>(this.fileParts);
        newPartsList.add(filePartInfo);
-       return new FilePartsBatch(newPartsList, batchState);
+       return new FilePartsBatch(newPartsList, isComplete);
     }
 
+    FilePartsBatch completeBatch() {
+        return new FilePartsBatch(this.fileParts, true);
+    }
+
+    boolean isComplete() {
+        return isComplete;
+    }
 
     long getMinCreationTimeMs() {
         return minCreationTimeMs;
+    }
+
+    long getAgeMs() {
+        return System.currentTimeMillis() - minCreationTimeMs;
     }
 
     long getTotalSizeBytes() {
@@ -80,14 +91,10 @@ public class FilePartsBatch {
     @Override
     public String toString() {
         return "FilePartsBatch{" +
-                "minCreationTimeMs=" + minCreationTimeMs +
+                "isComplete=" + isComplete +
+                ", minCreationTimeMs=" + minCreationTimeMs +
                 ", totalSizeBytes=" + totalSizeBytes +
                 ", fileParts=" + fileParts +
                 '}';
-    }
-
-    public static enum BatchState {
-        COMPLETE,
-        INCOMPLETE
     }
 }

@@ -32,13 +32,12 @@ class KryoPoolHolder {
          kryo.register(ArrayList.class, 11);
          kryo.register(FilePartInfo.class, 12);
          kryo.register(FilePartsBatch.class, 13);
-         registerEnum(kryo, FilePartsBatch.BatchState.class, 14);
-         kryo.register(BatchChangeEvent.class, 15);
-         registerEnum(kryo, BatchChangeEvent.ChangeType.class, 16);
-         kryo.register(BatchKey.class, 17);
+         kryo.register(BatchChangeEvent.class, 14);
+         registerEnum(kryo, BatchChangeEvent.ChangeType.class, 15);
+         kryo.register(BatchKey.class, 16);
          // custom serialises to deal with private classes
-         kryo.register(Collections.EMPTY_LIST.getClass(), new CollectionsEmptyListSerializer(), 18);
-         kryo.register(Collections.singletonList("").getClass(), new CollectionsSingletonListSerializer(), 19);
+         kryo.register(Collections.EMPTY_LIST.getClass(), new CollectionsEmptyListSerializer(), 17);
+         kryo.register(Collections.singletonList("").getClass(), new CollectionsSingletonListSerializer(), 18);
 
          ((Kryo.DefaultInstantiatorStrategy) kryo.getInstantiatorStrategy()).setFallbackInstantiatorStrategy(
                  new StdInstantiatorStrategy());

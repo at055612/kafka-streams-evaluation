@@ -1,6 +1,5 @@
 package kafkastreamsevaluation.util;
 
-import kafkastreamsevaluation.model.MessageValue;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -101,13 +100,15 @@ public class KafkaUtils {
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BOOTSTRAP_SERVERS);
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, appId);
         props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, KAFKA_ZOOKEEPER_QUORUM);
-        props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 3_000);
+        props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 1_000);
 
         //latest = when the consumer starts for the first time, grab the latest offset
         //earliest = when the consumer starts for the first time, grab the earliest offset
         //latest is preferable for testing as it stops messages from previous runs from being consumed,
         //but means the consumers need to be started before anything puts new messages on the topic.
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+
+        props.put("cache.max.bytes.buffering", 0L);
 
         //if multiple users are running streams on the same box they will get IO errors if they use the
         //sae state dir
