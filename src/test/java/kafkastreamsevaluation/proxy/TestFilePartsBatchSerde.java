@@ -70,20 +70,5 @@ public class TestFilePartsBatchSerde {
                 .isEqualTo(destObject);
     }
 
-    @Test
-    public void testSerDeser_empty() {
-        FilePartsBatchSerde serde = FilePartsBatchSerde.instance();
-
-        FilePartsBatch sourceObject = FilePartsBatch.emptyBatch();
-
-        byte[] bytes = serde.serialize("topic", sourceObject);
-
-        LOGGER.info("bytes length = " + bytes.length);
-
-        FilePartsBatch destObject = serde.deserialize("topic", bytes);
-
-        Assertions.assertThat(sourceObject)
-                .isEqualTo(destObject);
-    }
 
 }

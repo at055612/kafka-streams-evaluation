@@ -33,10 +33,6 @@ public class FilePartsBatch {
         this.isComplete = isComplete;
     }
 
-    static FilePartsBatch emptyBatch() {
-        return new FilePartsBatch(Collections.emptyList(), false);
-    }
-
     FilePartsBatch addFilePart(FilePartInfo filePartInfo) {
        Objects.requireNonNull(filePartInfo);
 

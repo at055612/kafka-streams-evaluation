@@ -266,7 +266,7 @@ public class ProxyAggBatchingExample {
 
                     if (currentBatch == null) {
                         // no batch for this feed so create one
-                        FilePartsBatch newBatch = new FilePartsBatch( filePartInfo, false);
+                        FilePartsBatch newBatch = new FilePartsBatch(filePartInfo, false);
                         // TODO need to test for readiness after adding.
                         outputBatchChangeLog.add(newBatch);
                         LOGGER.debug("Created new batch, count: " + newBatch.getFilePartsCount());
