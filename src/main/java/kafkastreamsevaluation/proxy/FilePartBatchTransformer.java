@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.NavigableSet;
 import java.util.concurrent.atomic.LongAdder;
 
-class FilePartBatchTransformer implements Transformer<String, FilePartInfo, KeyValue<String, FilePartsBatch>> {
+public class FilePartBatchTransformer implements Transformer<String, FilePartInfo, KeyValue<String, FilePartsBatch>> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FilePartBatchTransformer.class);
 
@@ -28,8 +28,8 @@ class FilePartBatchTransformer implements Transformer<String, FilePartInfo, KeyV
     private KeyValueStore<String, FilePartsBatch> keyValueStore;
 
 
-    FilePartBatchTransformer(final String stateStoreName,
-                             final AggregationPolicySupplier aggregationPolicySupplier) {
+    public FilePartBatchTransformer(final String stateStoreName,
+                                    final AggregationPolicySupplier aggregationPolicySupplier) {
         this.stateStoreName = stateStoreName;
         this.aggregationPolicySupplier = aggregationPolicySupplier;
     }

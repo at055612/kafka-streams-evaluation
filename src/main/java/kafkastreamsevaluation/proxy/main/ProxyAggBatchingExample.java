@@ -1,7 +1,10 @@
-package kafkastreamsevaluation.proxy;
+package kafkastreamsevaluation.proxy.main;
 
 import com.google.common.collect.Maps;
 import io.vavr.Tuple2;
+import kafkastreamsevaluation.proxy.BatchKey;
+import kafkastreamsevaluation.proxy.FilePartInfo;
+import kafkastreamsevaluation.proxy.FilePartsBatch;
 import kafkastreamsevaluation.proxy.serde.BatchKeySerde;
 import kafkastreamsevaluation.proxy.serde.FilePartInfoSerde;
 import kafkastreamsevaluation.proxy.serde.FilePartsBatchSerde;

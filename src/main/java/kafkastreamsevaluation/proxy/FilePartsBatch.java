@@ -10,45 +10,59 @@ public class FilePartsBatch {
     private final boolean isComplete;
     private final long minCreationTimeMs;
     private final long totalSizeBytes;
-    // TODO may be better to only store a list of the bare minimum info to be able to locate a part
-    // ie. just inputFileName and base name.  We are keeping a running count of total size and
-    // min time so storing them for each part is a waste of memory/disk/processing.
-    private final List<FilePartInfo> fileParts;
+    private final List<FilePartRef> fileParts;
 
-    FilePartsBatch(final FilePartInfo filePartInfo, final boolean isComplete) {
-        this.fileParts = Collections.singletonList(Objects.requireNonNull(filePartInfo));
+    private FilePartsBatch(final boolean isComplete,
+                           final long minCreationTimeMs,
+                           final long totalSizeBytes,
+                           final List<FilePartRef> fileParts) {
+        this.isComplete = isComplete;
+        this.minCreationTimeMs = minCreationTimeMs;
+        this.totalSizeBytes = totalSizeBytes;
+        this.fileParts = fileParts;
+    }
+
+    public FilePartsBatch(final FilePartInfo filePartInfo,
+                          final boolean isComplete) {
+        this.fileParts = Collections.singletonList(Objects.requireNonNull(filePartInfo.getFilePartRef()));
         this.minCreationTimeMs = filePartInfo.getCreationTimeMs();
         this.totalSizeBytes = filePartInfo.getSizeBytes();
         this.isComplete = isComplete;
     }
 
-    FilePartsBatch(final List<FilePartInfo> fileParts, final boolean isComplete) {
-        this.fileParts = new ArrayList<>(Objects.requireNonNull(fileParts));
+//    FilePartsBatch(final List<FilePartInfo> fileParts,
+//                   final boolean isComplete) {
+//        this.fileParts = new ArrayList<>(Objects.requireNonNull(fileParts));
+//
+//        this.minCreationTimeMs = fileParts.stream()
+//                .mapToLong(FilePartInfo::getCreationTimeMs)
+//                .min()
+//                .orElse(Long.MAX_VALUE);
+//
+//        this.totalSizeBytes = fileParts.stream()
+//                .mapToLong(FilePartInfo::getSizeBytes)
+//                .sum();
+//        this.isComplete = isComplete;
+//    }
 
-        this.minCreationTimeMs = fileParts.stream()
-                .mapToLong(FilePartInfo::getCreationTimeMs)
-                .min()
-                .orElse(Long.MAX_VALUE);
-
-        this.totalSizeBytes = fileParts.stream()
-                .mapToLong(FilePartInfo::getSizeBytes)
-                .sum();
-        this.isComplete = isComplete;
-    }
-
-    FilePartsBatch addFilePart(FilePartInfo filePartInfo) {
+    public FilePartsBatch addFilePart(FilePartInfo filePartInfo) {
        Objects.requireNonNull(filePartInfo);
 
-       List<FilePartInfo> newPartsList = new ArrayList<>(this.fileParts);
-       newPartsList.add(filePartInfo);
-       return new FilePartsBatch(newPartsList, isComplete);
+       final List<FilePartRef> newPartsList = new ArrayList<>(this.fileParts);
+       newPartsList.add(filePartInfo.getFilePartRef());
+
+       // compute the new aggregates
+       long newMinCreationTimeMs = Math.min(this.minCreationTimeMs, filePartInfo.getCreationTimeMs());
+       long newTotalSizeBytes = this.totalSizeBytes + filePartInfo.getSizeBytes();
+
+       return new FilePartsBatch(isComplete, newMinCreationTimeMs, newTotalSizeBytes, newPartsList);
     }
 
-    FilePartsBatch completeBatch() {
-        return new FilePartsBatch(this.fileParts, true);
+    public FilePartsBatch completeBatch() {
+        return new FilePartsBatch(true, minCreationTimeMs, totalSizeBytes, fileParts);
     }
 
-    boolean isComplete() {
+    public boolean isComplete() {
         return isComplete;
     }
 
@@ -56,19 +70,19 @@ public class FilePartsBatch {
         return minCreationTimeMs;
     }
 
-    long getAgeMs() {
+    public long getAgeMs() {
         return System.currentTimeMillis() - minCreationTimeMs;
     }
 
-    long getTotalSizeBytes() {
+    public long getTotalSizeBytes() {
         return totalSizeBytes;
     }
 
-    List<FilePartInfo> getFileParts() {
+    List<FilePartRef> getFileParts() {
         return fileParts;
     }
 
-    int getFilePartsCount() {
+    public int getFilePartsCount() {
         return fileParts.size();
     }
 
@@ -77,14 +91,15 @@ public class FilePartsBatch {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         final FilePartsBatch that = (FilePartsBatch) o;
-        return minCreationTimeMs == that.minCreationTimeMs &&
+        return isComplete == that.isComplete &&
+                minCreationTimeMs == that.minCreationTimeMs &&
                 totalSizeBytes == that.totalSizeBytes &&
                 fileParts.equals(that.fileParts);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(minCreationTimeMs, totalSizeBytes, fileParts);
+        return Objects.hash(isComplete, minCreationTimeMs, totalSizeBytes, fileParts);
     }
 
     @Override

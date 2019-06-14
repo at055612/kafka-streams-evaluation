@@ -10,6 +10,7 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.ForeachAction;
 import org.apache.kafka.streams.kstream.Predicate;
@@ -126,6 +127,34 @@ public class KafkaUtils {
         return new StreamsConfig(props);
     }
 
+    public static Properties buildStreamsProperties() {
+        Properties props = new Properties();
+
+        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BOOTSTRAP_SERVERS);
+//        props.put(StreamsConfig.ZOOKEEPER_CONNECT_CONFIG, KAFKA_ZOOKEEPER_QUORUM);
+        props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 1_000);
+
+        //latest = when the consumer starts for the first time, grab the latest offset
+        //earliest = when the consumer starts for the first time, grab the earliest offset
+        //latest is preferable for testing as it stops messages from previous runs from being consumed,
+        //but means the consumers need to be started before anything puts new messages on the topic.
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+
+//        props.put("cache.max.bytes.buffering", 0L);
+
+        props.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 2);
+
+        //if multiple users are running streams on the same box they will get IO errors if they use the
+        //sae state dir
+        String user = Optional.ofNullable(System.getProperty("user.name")).orElse("unknownUser");
+        props.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/kafka-streams-" + user);
+
+        props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+        props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+
+        return props;
+    }
+
     /**
      * Builds a StreamsConfig object with standard config, any additionalProps passed will be added to
      * the config object
@@ -139,6 +168,25 @@ public class KafkaUtils {
             Arrays.stream(additionalProps).forEach(entry -> props.put(entry.getKey(), entry.getValue()));
         }
         return buildStreamsConfig(appId, props);
+    }
+
+    public static ExecutorService startStreamProcessor(final StreamProcessor streamProcessor,
+                                                final ExecutorService executorService) {
+
+        final KafkaStreams kafkaStreams = new KafkaStreams(
+                streamProcessor.getTopology(),
+                streamProcessor.getStreamConfig());
+
+        executorService.submit(kafkaStreams::start);
+
+        return executorService;
+    }
+
+    public static ExecutorService startStreamProcessor(final StreamProcessor streamProcessor) {
+
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+
+        return startStreamProcessor(streamProcessor, executorService);
     }
 
     public static <K,V> List<Future<RecordMetadata>> sendMessages(
@@ -367,7 +415,9 @@ public class KafkaUtils {
                                                                      final Class<V> valueType) {
         return (k, v) -> {
             LOGGER.info("Seen message in stream - \n  appId = {}\n  key = {}\n  value = {}",
-                    appId, k.toString(), v.toString());
+                    appId,
+                    k == null ? "NULL" : k.toString(),
+                    v == null ? "NULL" : v.toString());
             //abuse of a predicate as a peek method on the stream, so always return true so the
             //steam is not mutated
         };
@@ -378,6 +428,8 @@ public class KafkaUtils {
         private static KafkaProducer<String, String> kafkaProducer = buildKafkaProducer();
 
     }
+
+
 
 
 }

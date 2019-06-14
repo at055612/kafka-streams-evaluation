@@ -13,7 +13,7 @@ public class AggregationPolicy {
     private final int maxFileParts;
     private final long maxAgeMs;
 
-    AggregationPolicy(final long maxSizeBytes, final int maxFileParts, final long maxAgeMs) {
+    public AggregationPolicy(final long maxSizeBytes, final int maxFileParts, final long maxAgeMs) {
         this.maxSizeBytes = maxSizeBytes;
         this.maxFileParts = maxFileParts;
         this.maxAgeMs = maxAgeMs;

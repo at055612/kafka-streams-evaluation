@@ -4,28 +4,27 @@ import java.util.Objects;
 
 public class FilePartInfo {
 
-    private final String inputFilePath;
-    private final String baseName;
+    private final FilePartRef filePartRef;
     private final long creationTimeMs;
     private final long sizeBytes;
 
-    FilePartInfo(final String inputFilePath,
-                 final String baseName,
-                 final long creationTimeMs,
-                 final long sizeBytes) {
+    public FilePartInfo(final String inputFilePath,
+                        final String baseName,
+                        final long creationTimeMs,
+                        final long sizeBytes) {
 
-        this.inputFilePath = Objects.requireNonNull(inputFilePath);
-        this.baseName = Objects.requireNonNull(baseName);
+
+        this.filePartRef = new FilePartRef(Objects.requireNonNull(inputFilePath), Objects.requireNonNull(baseName));
         this.creationTimeMs = creationTimeMs;
         this.sizeBytes = sizeBytes;
     }
 
     String getInputFilePath() {
-        return inputFilePath;
+        return filePartRef.getInputFilePath();
     }
 
-    String getBaseName() {
-        return baseName;
+    public String getBaseName() {
+        return filePartRef.getPartBaseName();
     }
 
     long getCreationTimeMs() {
@@ -36,6 +35,10 @@ public class FilePartInfo {
         return sizeBytes;
     }
 
+    FilePartRef getFilePartRef() {
+        return filePartRef;
+    }
+
     @Override
     public boolean equals(final Object o) {
         if (this == o) return true;
@@ -43,20 +46,18 @@ public class FilePartInfo {
         final FilePartInfo that = (FilePartInfo) o;
         return creationTimeMs == that.creationTimeMs &&
                 sizeBytes == that.sizeBytes &&
-                inputFilePath.equals(that.inputFilePath) &&
-                baseName.equals(that.baseName);
+                filePartRef.equals(that.filePartRef);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(inputFilePath, baseName, creationTimeMs, sizeBytes);
+        return Objects.hash(filePartRef, creationTimeMs, sizeBytes);
     }
 
     @Override
     public String toString() {
         return "FilePartInfo{" +
-                "inputFilePath='" + inputFilePath + '\'' +
-                ", baseName='" + baseName + '\'' +
+                "filePartRef=" + filePartRef +
                 ", creationTimeMs=" + creationTimeMs +
                 ", sizeBytes=" + sizeBytes +
                 '}';

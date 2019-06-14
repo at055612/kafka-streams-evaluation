@@ -9,6 +9,7 @@ import de.javakaffee.kryoserializers.CollectionsSingletonListSerializer;
 import kafkastreamsevaluation.proxy.BatchChangeEvent;
 import kafkastreamsevaluation.proxy.BatchKey;
 import kafkastreamsevaluation.proxy.FilePartInfo;
+import kafkastreamsevaluation.proxy.FilePartRef;
 import kafkastreamsevaluation.proxy.FilePartsBatch;
 import org.objenesis.strategy.StdInstantiatorStrategy;
 import org.slf4j.Logger;
@@ -38,6 +39,7 @@ class KryoPoolHolder {
          // custom serialises to deal with private classes
          kryo.register(Collections.EMPTY_LIST.getClass(), new CollectionsEmptyListSerializer(), 17);
          kryo.register(Collections.singletonList("").getClass(), new CollectionsSingletonListSerializer(), 18);
+         kryo.register(FilePartRef.class, 19);
 
          ((Kryo.DefaultInstantiatorStrategy) kryo.getInstantiatorStrategy()).setFallbackInstantiatorStrategy(
                  new StdInstantiatorStrategy());

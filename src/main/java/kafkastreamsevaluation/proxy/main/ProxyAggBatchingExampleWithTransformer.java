@@ -1,6 +1,11 @@
-package kafkastreamsevaluation.proxy;
+package kafkastreamsevaluation.proxy.main;
 
 import com.google.common.collect.Maps;
+import kafkastreamsevaluation.proxy.AggregationPolicy;
+import kafkastreamsevaluation.proxy.AggregationPolicySupplier;
+import kafkastreamsevaluation.proxy.FilePartBatchTransformer;
+import kafkastreamsevaluation.proxy.FilePartInfo;
+import kafkastreamsevaluation.proxy.FilePartsBatch;
 import kafkastreamsevaluation.proxy.serde.FilePartInfoSerde;
 import kafkastreamsevaluation.proxy.serde.FilePartsBatchSerde;
 import kafkastreamsevaluation.util.KafkaUtils;
@@ -41,8 +46,11 @@ public class ProxyAggBatchingExampleWithTransformer {
     private static final String BATCH_CREATION_APP_ID = ProxyAggBatchingExampleWithTransformer.class.getSimpleName() + "-batchCreation";
     private static final String BATCH_CONSUMPTION_APP_ID = ProxyAggBatchingExampleWithTransformer.class.getSimpleName() + "-batchConsumption";
 
-    private static final String FEED_TO_PARTS_TOPIC = "FeedToPartsTopic";
-    private static final String COMPLETED_BATCH_TOPIC = "CompletedBatchTopic";
+    private static final String INPUT_FILE_TOPIC = "InputFiles";
+    private static final String FILE_PART_REF_COUNT_DELTAS_TOPIC = "FilePartRefCountDeltas"; // inputFilePath|baseName -> refCountDelta
+    private static final String INPUT_FILE_REF_COUNT_TOPIC = "InputFileRefCount"; // inputFilePath -> refCount
+    private static final String FEED_TO_PARTS_TOPIC = "FeedToParts";
+    private static final String COMPLETED_BATCH_TOPIC = "CompletedBatch";
 
     /*
 
