@@ -10,8 +10,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NavigableSet;
+import java.util.concurrent.atomic.LongAdder;
 
 class FilePartBatchTransformer implements Transformer<String, FilePartInfo, KeyValue<String, FilePartsBatch>> {
 
@@ -19,6 +22,7 @@ class FilePartBatchTransformer implements Transformer<String, FilePartInfo, KeyV
 
     private final String stateStoreName;
     private final AggregationPolicySupplier aggregationPolicySupplier;
+    private final BatchTimeTracker batchTimeTracker = new BatchTimeTracker();
 
     private ProcessorContext processorContext;
     private KeyValueStore<String, FilePartsBatch> keyValueStore;
@@ -32,14 +36,20 @@ class FilePartBatchTransformer implements Transformer<String, FilePartInfo, KeyV
 
     @Override
     public void init(final ProcessorContext processorContext) {
-        LOGGER.debug("Initialising transformer");
         this.processorContext = processorContext;
         this.keyValueStore = (KeyValueStore) processorContext.getStateStore(stateStoreName);
+        LOGGER.debug("Initialising transformer, estimated store size: {}", keyValueStore.approximateNumEntries());
+        initBatchTimeTracker();
+        if (LOGGER.isDebugEnabled()) {
+            dumpExpensiveStoreCount();
+            dumpKeyValueStore();
+            dumpTimeTrackerContents();
+        }
 
         // TODO This interval would have to be less than the max age of the batches
         // Some form of delay queue may be preferable to this somewhat crude approach
         processorContext.schedule(
-                Duration.ofSeconds(30).toMillis(),
+                Duration.ofSeconds(5).toMillis(),
                 PunctuationType.WALL_CLOCK_TIME,
                 this::doPunctuate);
     }
@@ -94,6 +104,12 @@ class FilePartBatchTransformer implements Transformer<String, FilePartInfo, KeyV
 
         // Update the batch held in the store for the next message for this feedname
         keyValueStore.put(feedName, newStoreBatch);
+        // Update the time we expect the batch to have expired on, or remove it from the tracker
+        if (newStoreBatch != null) {
+            batchTimeTracker.put(feedName, aggregationPolicy.getBatchExpiryTimeEpochMs(newStoreBatch));
+        } else {
+            batchTimeTracker.remove(feedName);
+        }
 
         // send our completed batch(es) (if any) downstream
         completedBatches.forEach(completedBatch ->
@@ -109,19 +125,100 @@ class FilePartBatchTransformer implements Transformer<String, FilePartInfo, KeyV
 
     }
 
+
+
+    // TODO Think we may need to make the tracker threadsafe so we can be sure it represents what is
+    // in the kv store, or bin it all together and just iterate over all the batches in the store
+    // testing each one, which is probably slower.
     private void doPunctuate(long timestamp) {
-        // TODO this seems a bit costly to keep scanning over all batches
-        // Some kind of delay queue would be preferable
+        LOGGER.debug("doPunctuate called, estimated store size {}", keyValueStore.approximateNumEntries());
+        if (LOGGER.isDebugEnabled()) {
+            dumpExpensiveStoreCount();
+            dumpKeyValueStore();
+            dumpTimeTrackerContents();
+        }
+
+        // Use our tracker of batch's expiry times (which is updated each time the batch is mutated)
+        // to get those that should have expired
+        NavigableSet<BatchTimeTracker.BatchTime> expiredBatches = batchTimeTracker.getExpiredBatches();
+
+        LOGGER.debug("Found {} expired batches", expiredBatches.size());
+
+        expiredBatches
+            .forEach(batchTime -> {
+                String feedName = batchTime.getFeedName();
+                final AggregationPolicy aggregationPolicy = aggregationPolicySupplier.getAggregationPolicy(feedName);
+                final FilePartsBatch currentBatch = keyValueStore.get(batchTime.getFeedName());
+                if (currentBatch != null) {
+                    if (aggregationPolicy.isBatchReady(currentBatch)) {
+                        FilePartsBatch completedBatch = currentBatch.completeBatch();
+                        LOGGER.debug("Completing new batch, completed batch count: " + completedBatch.getFilePartsCount());
+                        processorContext.forward(feedName, completedBatch);
+                        keyValueStore.put(feedName, null);
+                        batchTimeTracker.remove(feedName);
+                    } else {
+                        LOGGER.debug("Batch should be expired but it is not. Feed {}, tracker time {}, batch expired time {}",
+                                feedName,
+                                Instant.ofEpochMilli(batchTime.getTimeMs()),
+                                Instant.ofEpochMilli(aggregationPolicy.getBatchExpiryTimeEpochMs(currentBatch)));
+                    }
+                } else {
+                    LOGGER.debug("Batch for feed {} was in the tracker but has been removed from the store", feedName);
+                }
+            });
+    }
+
+    /**
+     * Populate the tracker by scanning over all items in the kv store
+     */
+    private void initBatchTimeTracker() {
         KeyValueIterator<String, FilePartsBatch> valuesIterator = keyValueStore.all();
         while (valuesIterator.hasNext()) {
-            KeyValue<String, FilePartsBatch> keyValue = valuesIterator.next();
-            if (keyValue.value != null) {
-                FilePartsBatch completedBatch = keyValue.value.completeBatch();
-                processorContext.forward(keyValue.key, completedBatch);
+            final KeyValue<String, FilePartsBatch> keyValue = valuesIterator.next();
+            final String feedName = keyValue.key;
+            final FilePartsBatch currentBatch = keyValue.value;
+            if (currentBatch != null) {
+                final AggregationPolicy aggregationPolicy = aggregationPolicySupplier.getAggregationPolicy(feedName);
+                long batchExpiryTimeEpochMs = aggregationPolicy.getBatchExpiryTimeEpochMs(currentBatch);
 
-                keyValueStore.put(keyValue.key, null);
+                batchTimeTracker.put(feedName, batchExpiryTimeEpochMs);
             }
         }
+    }
+
+    private void dumpKeyValueStore() {
+        StringBuilder stringBuilder = new StringBuilder();
+        keyValueStore.all().forEachRemaining(keyValue -> {
+            stringBuilder.append(
+                    String.format("\n  %s: %s",
+                            keyValue.key,
+                            keyValue.value == null ? "-" : keyValue.value.getFilePartsCount()));
+        });
+        LOGGER.debug("Dumping keyValueStore contents{}", stringBuilder.toString());
+    }
+
+    private void dumpExpensiveStoreCount() {
+        LongAdder countAll = new LongAdder();
+        LongAdder countNulls = new LongAdder();
+        keyValueStore.all()
+                .forEachRemaining(kv -> {
+                    countAll.increment();
+                    if (kv.value == null) {
+                        countNulls.increment();
+                    }
+                });
+        LOGGER.debug("Store count: {}, null values {}", countAll.sum(), countNulls.sum());
+    }
+
+    private void dumpTimeTrackerContents() {
+        StringBuilder stringBuilder = new StringBuilder();
+        batchTimeTracker.iterator().forEachRemaining(batchTime -> {
+            stringBuilder.append(
+                    String.format("\n  %s: %s",
+                            batchTime.getFeedName(),
+                            Instant.ofEpochMilli(batchTime.getTimeMs()).toString()));
+        });
+        LOGGER.debug("Dumping time tracker contents{}", stringBuilder.toString());
     }
 
 }

@@ -213,7 +213,7 @@ public class ProxyAggBatchingExampleWithTransformer {
 
         final StreamsConfig streamsConfig = KafkaUtils.buildStreamsConfig(
                 BATCH_CREATION_APP_ID,
-                Maps.immutableEntry(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 1));
+                Maps.immutableEntry(StreamsConfig.NUM_STREAM_THREADS_CONFIG, 2));
 
         Serde<String> feedNameSerde = Serdes.String();
         Serde<FilePartInfo> filePartInfoSerde = FilePartInfoSerde.instance();
@@ -224,7 +224,7 @@ public class ProxyAggBatchingExampleWithTransformer {
         AggregationPolicy defaultAggregationPolicy = new AggregationPolicy(
                 1024L * 10,
                 3,
-                Duration.ofSeconds(30).toMillis());
+                Duration.ofSeconds(10).toMillis());
         AggregationPolicySupplier aggregationPolicySupplier = new AggregationPolicySupplier(defaultAggregationPolicy);
 
         KeyValueBytesStoreSupplier storeSupplier = Stores.persistentKeyValueStore(storeName);
@@ -300,13 +300,13 @@ public class ProxyAggBatchingExampleWithTransformer {
 
         long offsetMins = 1;
 
-        for (int i = 0; i < 10; i++) {
-            final String feedName = "FEED_" + i % 1;
-            final long createTimeMs = baseTime.plusMinutes(offsetMins * i).toInstant().toEpochMilli();
+        for (int i = 0; i < 20; i++) {
+            final String feedName = "FEED_" + i % 3;
+//            final long createTimeMs = baseTime.plusMinutes(offsetMins * i).toInstant().toEpochMilli();
             final FilePartInfo filePartInfo = new FilePartInfo(
                     "/some/path/" + feedName + "_" + i + ".zip",
                     "" + i,
-                    createTimeMs,
+                    System.currentTimeMillis(),
                     i + 1000);
 
             ProducerRecord<String, FilePartInfo> producerRecord = new ProducerRecord<>(

@@ -10,6 +10,9 @@ public class FilePartsBatch {
     private final boolean isComplete;
     private final long minCreationTimeMs;
     private final long totalSizeBytes;
+    // TODO may be better to only store a list of the bare minimum info to be able to locate a part
+    // ie. just inputFileName and base name.  We are keeping a running count of total size and
+    // min time so storing them for each part is a waste of memory/disk/processing.
     private final List<FilePartInfo> fileParts;
 
     FilePartsBatch(final FilePartInfo filePartInfo, final boolean isComplete) {

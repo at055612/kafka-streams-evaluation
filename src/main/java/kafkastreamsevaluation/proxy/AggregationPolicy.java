@@ -45,6 +45,14 @@ public class AggregationPolicy {
         return true;
     }
 
+    /**
+     * @param filePartsBatch
+     * @return The
+     */
+    long getBatchExpiryTimeEpochMs(final FilePartsBatch filePartsBatch) {
+        return filePartsBatch.getMinCreationTimeMs() + maxAgeMs;
+    }
+
 //    boolean wouldBeReadyWith(final FilePartsBatch currentbatch, final FilePartInfo filePartInfo) {
 //        Objects.requireNonNull(currentbatch);
 //        Objects.requireNonNull(filePartInfo);
