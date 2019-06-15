@@ -1,7 +1,10 @@
 package kafkastreamsevaluation.proxy.processors;
 
 import kafkastreamsevaluation.proxy.Constants;
+import kafkastreamsevaluation.proxy.FilePartConsumptionState;
 import kafkastreamsevaluation.proxy.FilePartInfo;
+import kafkastreamsevaluation.proxy.serde.BooleanSerde;
+import kafkastreamsevaluation.proxy.serde.FilePartConsumptionStateSerde;
 import kafkastreamsevaluation.proxy.serde.FilePartInfoSerde;
 import kafkastreamsevaluation.util.KafkaUtils;
 import org.apache.kafka.common.serialization.Serde;
@@ -43,8 +46,10 @@ public class InputFileInspector extends AbstractStreamProcessor {
     public Topology getTopology() {
 
         Serde<String> stringSerde = Serdes.String();
+        Serde<Boolean> booleanSerde = new BooleanSerde();
         Serde<byte[]> byteArraySerde = Serdes.ByteArray();
         Serde<FilePartInfo> filePartInfoSerde = new FilePartInfoSerde();
+        Serde<FilePartConsumptionState> filePartConsumptionStateSerde = new FilePartConsumptionStateSerde();
 
         StreamsBuilder streamsBuilder = new StreamsBuilder();
 
@@ -54,7 +59,9 @@ public class InputFileInspector extends AbstractStreamProcessor {
         inputFilePathsStream
                 .peek(KafkaUtils.buildLoggingStreamPeeker(getAppId(), byte[].class, String.class))
                 .flatMap(this::fileInspectorFlatMapper)
-                .to(Constants.FEED_TO_PARTS_TOPIC, Produced.with(stringSerde, filePartInfoSerde));
+                .through(Constants.FEED_TO_PARTS_TOPIC, Produced.with(stringSerde, filePartInfoSerde))
+                .map(this::consumedStateMapper)
+                .to(Constants.FILE_PART_CONSUMED_STATE_TOPIC, Produced.with(stringSerde, filePartConsumptionStateSerde));
 
         return streamsBuilder.build();
     }
@@ -81,5 +88,18 @@ public class InputFileInspector extends AbstractStreamProcessor {
                 .collect(Collectors.toList());
         return keyValues;
     }
+
+    /**
+     * Mark each file part as not yet consumed so we can track when to delete the input file.
+     */
+    private KeyValue<String, FilePartConsumptionState> consumedStateMapper(
+            final String feedName, final FilePartInfo filePartInfo) {
+
+        Objects.requireNonNull(filePartInfo);
+        return new KeyValue<>(
+                filePartInfo.getInputFilePath(),
+                new FilePartConsumptionState(filePartInfo.getBaseName(), false));
+    }
+
 
 }

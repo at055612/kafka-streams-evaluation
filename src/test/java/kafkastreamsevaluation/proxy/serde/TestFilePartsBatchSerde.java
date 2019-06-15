@@ -1,6 +1,7 @@
-package kafkastreamsevaluation.proxy;
+package kafkastreamsevaluation.proxy.serde;
 
-import kafkastreamsevaluation.proxy.serde.FilePartsBatchSerde;
+import kafkastreamsevaluation.proxy.FilePartInfo;
+import kafkastreamsevaluation.proxy.FilePartsBatch;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 import org.slf4j.Logger;

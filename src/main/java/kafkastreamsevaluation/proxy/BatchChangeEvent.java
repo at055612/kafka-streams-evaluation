@@ -32,7 +32,7 @@ public class BatchChangeEvent {
         this.filePartInfo = filePartInfo;
     }
 
-    static BatchChangeEvent createCompleteEvent() {
+    public static BatchChangeEvent createCompleteEvent() {
         return new BatchChangeEvent(ChangeType.COMPLETE, null);
     }
 
@@ -40,7 +40,7 @@ public class BatchChangeEvent {
         return new BatchChangeEvent(ChangeType.INITIALISE, null);
     }
 
-    static BatchChangeEvent createAddEvent(final FilePartInfo filePartInfo) {
+    public static BatchChangeEvent createAddEvent(final FilePartInfo filePartInfo) {
         return new BatchChangeEvent(ChangeType.ADD, filePartInfo);
     }
 

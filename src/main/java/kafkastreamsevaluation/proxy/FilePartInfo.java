@@ -19,7 +19,7 @@ public class FilePartInfo {
         this.sizeBytes = sizeBytes;
     }
 
-    String getInputFilePath() {
+    public String getInputFilePath() {
         return filePartRef.getInputFilePath();
     }
 
@@ -27,15 +27,15 @@ public class FilePartInfo {
         return filePartRef.getPartBaseName();
     }
 
-    long getCreationTimeMs() {
+    public long getCreationTimeMs() {
         return creationTimeMs;
     }
 
-    long getSizeBytes() {
+    public long getSizeBytes() {
         return sizeBytes;
     }
 
-    FilePartRef getFilePartRef() {
+    public FilePartRef getFilePartRef() {
         return filePartRef;
     }
 

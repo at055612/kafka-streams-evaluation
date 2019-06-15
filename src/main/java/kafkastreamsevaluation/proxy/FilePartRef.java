@@ -12,11 +12,11 @@ public class FilePartRef {
         this.partBaseName = Objects.requireNonNull(partBaseName);
     }
 
-    String getInputFilePath() {
+    public String getInputFilePath() {
         return inputFilePath;
     }
 
-    String getPartBaseName() {
+    public String getPartBaseName() {
         return partBaseName;
     }
 

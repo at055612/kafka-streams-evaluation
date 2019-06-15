@@ -1,7 +1,10 @@
 package kafkastreamsevaluation.proxy.main;
 
 import kafkastreamsevaluation.proxy.Constants;
+import kafkastreamsevaluation.proxy.processors.FilePartAggregator;
+import kafkastreamsevaluation.proxy.processors.FilePartsBatchConsumer;
 import kafkastreamsevaluation.proxy.processors.InputFileInspector;
+import kafkastreamsevaluation.proxy.processors.InputFileRemover;
 import kafkastreamsevaluation.proxy.serde.FilePartInfoSerde;
 import kafkastreamsevaluation.util.KafkaUtils;
 import kafkastreamsevaluation.util.StreamProcessor;
@@ -11,6 +14,7 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
@@ -26,8 +30,7 @@ public class ProxyAggEndToEndExample {
 
     private static final String GROUP_ID_BASE = ProxyAggBatchingExampleWithTransformer.class.getSimpleName();
 
-    private final Properties baseStreamsConfig;
-    private final StreamProcessor inputFileInspector;
+    private final List<StreamProcessor> allStreamProcessors = new ArrayList<>();
 
     public static void main(String[] args) {
         ProxyAggEndToEndExample proxyAggEndToEndExample = new ProxyAggEndToEndExample();
@@ -36,9 +39,19 @@ public class ProxyAggEndToEndExample {
 
     ProxyAggEndToEndExample() {
 
-        baseStreamsConfig = KafkaUtils.buildStreamsProperties();
+        final Properties baseStreamsConfig = KafkaUtils.buildStreamsProperties();
 
-        inputFileInspector = new InputFileInspector(baseStreamsConfig);
+        final StreamProcessor inputFileInspector = new InputFileInspector(baseStreamsConfig);
+        allStreamProcessors.add(inputFileInspector);
+
+        final StreamProcessor filePartsAggregator = new FilePartAggregator(baseStreamsConfig);
+        allStreamProcessors.add(filePartsAggregator);
+
+        final StreamProcessor filePartsBatchConsumer = new FilePartsBatchConsumer(baseStreamsConfig);
+        allStreamProcessors.add(filePartsBatchConsumer);
+
+        final StreamProcessor inputFileRemover = new InputFileRemover(baseStreamsConfig);
+        allStreamProcessors.add(inputFileRemover);
 
     }
 
@@ -59,13 +72,14 @@ public class ProxyAggEndToEndExample {
         KafkaUtils.sleep(30_000);
 
         stopStreamProcessors();
+
+        loggerExecutorService.shutdownNow();
     }
 
 
     private void startStreamProcessors() {
 
-        inputFileInspector.start();
-
+        allStreamProcessors.forEach(StreamProcessor::start);
     }
 
     private void sendInputFileTestMessages() {
@@ -100,7 +114,7 @@ public class ProxyAggEndToEndExample {
     }
 
     private void stopStreamProcessors() {
-        inputFileInspector.stop();
+        allStreamProcessors.forEach(StreamProcessor::stop);
     }
 
 

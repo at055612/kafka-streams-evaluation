@@ -7,7 +7,7 @@ public class BatchKey {
     private final String feedName;
     private final long batchId;
 
-    BatchKey(final String feedName, final long batchId) {
+    public BatchKey(final String feedName, final long batchId) {
         this.feedName = Objects.requireNonNull(feedName);
         this.batchId = batchId;
     }

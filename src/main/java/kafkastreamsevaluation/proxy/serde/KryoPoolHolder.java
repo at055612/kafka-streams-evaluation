@@ -8,6 +8,8 @@ import de.javakaffee.kryoserializers.CollectionsEmptyListSerializer;
 import de.javakaffee.kryoserializers.CollectionsSingletonListSerializer;
 import kafkastreamsevaluation.proxy.BatchChangeEvent;
 import kafkastreamsevaluation.proxy.BatchKey;
+import kafkastreamsevaluation.proxy.FilePartConsumptionState;
+import kafkastreamsevaluation.proxy.FilePartConsumptionStates;
 import kafkastreamsevaluation.proxy.FilePartInfo;
 import kafkastreamsevaluation.proxy.FilePartRef;
 import kafkastreamsevaluation.proxy.FilePartsBatch;
@@ -17,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 
 class KryoPoolHolder {
@@ -40,6 +43,9 @@ class KryoPoolHolder {
          kryo.register(Collections.EMPTY_LIST.getClass(), new CollectionsEmptyListSerializer(), 17);
          kryo.register(Collections.singletonList("").getClass(), new CollectionsSingletonListSerializer(), 18);
          kryo.register(FilePartRef.class, 19);
+         kryo.register(FilePartConsumptionStates.class, 20);
+         kryo.register(HashMap.class, 21);
+         kryo.register(FilePartConsumptionState.class, 22);
 
          ((Kryo.DefaultInstantiatorStrategy) kryo.getInstantiatorStrategy()).setFallbackInstantiatorStrategy(
                  new StdInstantiatorStrategy());
