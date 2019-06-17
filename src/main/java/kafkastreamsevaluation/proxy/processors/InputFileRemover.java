@@ -48,13 +48,15 @@ public class InputFileRemover extends AbstractStreamProcessor {
 
         final StreamsBuilder streamsBuilder = new StreamsBuilder();
 
+        // TODO need to ensure there is no compaction/caching of this topic as this is not
+        // a changelog and thus each msg value matters
         final KStream<String, FilePartConsumptionState> filePartConsumedStateStream = streamsBuilder
                 .stream(Constants.FILE_PART_CONSUMED_STATE_TOPIC,
                         Consumed.with(stringSerde, filePartConsumptionStateSerde));
 
-        final KTable<String, FilePartConsumptionStates> filePartConsumedStatesTable = streamsBuilder
-                .table(Constants.INPUT_FILE_CONSUMED_STATE_TOPIC,
-                        Consumed.with(stringSerde, filePartConsumptionStatesSerde));
+//        final KTable<String, FilePartConsumptionStates> filePartConsumedStatesTable = streamsBuilder
+//                .table(Constants.INPUT_FILE_CONSUMED_STATE_TOPIC,
+//                        Consumed.with(stringSerde, filePartConsumptionStatesSerde));
 
 //        final Initializer<FilePartConsumptionStates> initialiser = FilePartConsumptionStates::new;
 //
@@ -77,8 +79,9 @@ public class InputFileRemover extends AbstractStreamProcessor {
                     LOGGER.info("File {} can now be deleted", inputFilePath);
 
                     // TODO implement the actual file deletion
-                });
 
+                    // TODO may want to tombstone the aggregate topic as we no longer need the value
+                });
 
 //        KGroupedStream<String,<Tuple2<String,Boolean>>> groupedStream = filePartConsumedStateStream
 //                .mapValues((readOnlyKey, value) -> new Tuple2<>(readOnlyKey.getPartBaseName(), value))

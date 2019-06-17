@@ -1,8 +1,10 @@
 package kafkastreamsevaluation.proxy.main;
 
 import kafkastreamsevaluation.proxy.Constants;
+import kafkastreamsevaluation.proxy.FilePartsBatchConsumer;
+import kafkastreamsevaluation.proxy.StreamStoreBatchConsumer;
 import kafkastreamsevaluation.proxy.processors.FilePartAggregator;
-import kafkastreamsevaluation.proxy.processors.FilePartsBatchConsumer;
+import kafkastreamsevaluation.proxy.processors.FilePartsBatchProcessor;
 import kafkastreamsevaluation.proxy.processors.InputFileInspector;
 import kafkastreamsevaluation.proxy.processors.InputFileRemover;
 import kafkastreamsevaluation.proxy.serde.FilePartInfoSerde;
@@ -47,8 +49,13 @@ public class ProxyAggEndToEndExample {
         final StreamProcessor filePartsAggregator = new FilePartAggregator(baseStreamsConfig);
         allStreamProcessors.add(filePartsAggregator);
 
-        final StreamProcessor filePartsBatchConsumer = new FilePartsBatchConsumer(baseStreamsConfig);
-        allStreamProcessors.add(filePartsBatchConsumer);
+        // TODO This will need some sort of guice provider arrangement to inject the requiured
+        // FilePartsBatchConsumer based on config.
+        final FilePartsBatchConsumer filePartsBatchConsumer = new StreamStoreBatchConsumer();
+
+        final StreamProcessor filePartsBatchProcessor = new FilePartsBatchProcessor(
+                baseStreamsConfig, filePartsBatchConsumer);
+        allStreamProcessors.add(filePartsBatchProcessor);
 
         final StreamProcessor inputFileRemover = new InputFileRemover(baseStreamsConfig);
         allStreamProcessors.add(inputFileRemover);

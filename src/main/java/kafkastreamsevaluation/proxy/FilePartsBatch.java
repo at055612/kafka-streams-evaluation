@@ -78,7 +78,7 @@ public class FilePartsBatch {
         return totalSizeBytes;
     }
 
-    List<FilePartRef> getFileParts() {
+    public List<FilePartRef> getFileParts() {
         return fileParts;
     }
 
