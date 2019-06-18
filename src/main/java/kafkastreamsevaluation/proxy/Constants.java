@@ -11,4 +11,13 @@ public class Constants {
     public static final String INPUT_FILE_CONSUMED_STATE_TOPIC = "InputFileConsumedState"; // inputFilePath -> true/false
     public static final String FEED_TO_PARTS_TOPIC = "FeedToParts";
     public static final String COMPLETED_BATCH_TOPIC = "CompletedBatch";
+
+    /*
+    kcreate InputFiles
+    kcreate FilePartConsumedState
+    kcreate InputFileConsumedState
+    kcreate FeedToParts
+    kcreate CompletedBatch
+     */
+
 }

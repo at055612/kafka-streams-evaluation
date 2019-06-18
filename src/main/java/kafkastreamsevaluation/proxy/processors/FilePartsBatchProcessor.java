@@ -86,6 +86,8 @@ public class FilePartsBatchProcessor extends AbstractStreamProcessor {
                 .map(filePartRef -> {
                     FilePartConsumptionState consumptionState = new FilePartConsumptionState(
                             filePartRef.getPartBaseName(), true);
+                    LOGGER.debug("Marking {} {} as consumed",
+                            filePartRef.getInputFilePath(), filePartRef.getPartBaseName());
                     return new KeyValue<>(filePartRef.getInputFilePath(), consumptionState);
                 })
                 .collect(Collectors.toList());

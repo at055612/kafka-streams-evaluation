@@ -12,7 +12,6 @@ import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.KTable;
 import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Serialized;
 import org.slf4j.Logger;
@@ -73,10 +72,14 @@ public class InputFileRemover extends AbstractStreamProcessor {
                         Materialized.with(stringSerde, filePartConsumptionStatesSerde)
                 )
                 .filter((key, value) ->
-                        value.haveAllBeenConsumed())
+                        value != null && value.haveAllBeenConsumed())
                 .toStream()
                 .foreach((inputFilePath, filePartConsumptionStates) -> {
-                    LOGGER.info("File {} can now be deleted", inputFilePath);
+                    if (filePartConsumptionStates != null && filePartConsumptionStates.haveAllBeenConsumed()) {
+                        LOGGER.info("File {} can now be deleted", inputFilePath);
+                    } else {
+                        LOGGER.error("Shouldn't get here!!! {} {}", inputFilePath, filePartConsumptionStates);
+                    }
 
                     // TODO implement the actual file deletion
 

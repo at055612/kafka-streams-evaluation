@@ -13,7 +13,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.NavigableSet;
 import java.util.concurrent.atomic.LongAdder;
 
 public class FilePartBatchTransformer implements Transformer<String, FilePartInfo, KeyValue<String, FilePartsBatch>> {
@@ -43,7 +42,7 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
         if (LOGGER.isDebugEnabled()) {
             dumpExpensiveStoreCount();
             dumpKeyValueStore();
-            dumpTimeTrackerContents();
+//            dumpTimeTrackerContents();
         }
 
         // TODO This interval would have to be less than the max age of the batches
@@ -125,48 +124,71 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
 
     }
 
+    private void doPunctuate(long timestamp) {
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("doPunctuate called, estimated store size {}", keyValueStore.approximateNumEntries());
+            dumpExpensiveStoreCount();
+            dumpKeyValueStore();
+        }
 
+        // Loop over all the current batches in the kv store and check if any are ready to be completed
+        try (KeyValueIterator<String, FilePartsBatch> allEntries = keyValueStore.all()) {
+            allEntries.forEachRemaining(keyValue -> {
+                if (keyValue.value != null) {
+                    final String feedName = keyValue.key;
+                    final FilePartsBatch currentBatch = keyValue.value;
+                    final AggregationPolicy aggregationPolicy = aggregationPolicySupplier.getAggregationPolicy(feedName);
+                    if (aggregationPolicy.isBatchReady(currentBatch)) {
+                        final FilePartsBatch completedBatch = currentBatch.completeBatch();
+                        LOGGER.debug("Completing new batch, completed batch count: " + completedBatch.getFilePartsCount());
+                        keyValueStore.put(feedName, null);
+                        processorContext.forward(feedName, completedBatch);
+                    }
+                }
+            });
+        }
+    }
 
     // TODO Think we may need to make the tracker threadsafe so we can be sure it represents what is
     // in the kv store, or bin it all together and just iterate over all the batches in the store
     // testing each one, which is probably slower.
-    private void doPunctuate(long timestamp) {
-        LOGGER.debug("doPunctuate called, estimated store size {}", keyValueStore.approximateNumEntries());
-        if (LOGGER.isDebugEnabled()) {
-            dumpExpensiveStoreCount();
-            dumpKeyValueStore();
-            dumpTimeTrackerContents();
-        }
-
-        // Use our tracker of batch's expiry times (which is updated each time the batch is mutated)
-        // to get those that should have expired
-        NavigableSet<BatchTimeTracker.BatchTime> expiredBatches = batchTimeTracker.getExpiredBatches();
-
-        LOGGER.debug("Found {} expired batches", expiredBatches.size());
-
-        expiredBatches
-            .forEach(batchTime -> {
-                String feedName = batchTime.getFeedName();
-                final AggregationPolicy aggregationPolicy = aggregationPolicySupplier.getAggregationPolicy(feedName);
-                final FilePartsBatch currentBatch = keyValueStore.get(batchTime.getFeedName());
-                if (currentBatch != null) {
-                    if (aggregationPolicy.isBatchReady(currentBatch)) {
-                        FilePartsBatch completedBatch = currentBatch.completeBatch();
-                        LOGGER.debug("Completing new batch, completed batch count: " + completedBatch.getFilePartsCount());
-                        processorContext.forward(feedName, completedBatch);
-                        keyValueStore.put(feedName, null);
-                        batchTimeTracker.remove(feedName);
-                    } else {
-                        LOGGER.debug("Batch should be expired but it is not. Feed {}, tracker time {}, batch expired time {}",
-                                feedName,
-                                Instant.ofEpochMilli(batchTime.getTimeMs()),
-                                Instant.ofEpochMilli(aggregationPolicy.getBatchExpiryTimeEpochMs(currentBatch)));
-                    }
-                } else {
-                    LOGGER.debug("Batch for feed {} was in the tracker but has been removed from the store", feedName);
-                }
-            });
-    }
+//    private void doPunctuate(long timestamp) {
+//        LOGGER.debug("doPunctuate called, estimated store size {}", keyValueStore.approximateNumEntries());
+//        if (LOGGER.isDebugEnabled()) {
+//            dumpExpensiveStoreCount();
+//            dumpKeyValueStore();
+//            dumpTimeTrackerContents();
+//        }
+//
+//        // Use our tracker of batch's expiry times (which is updated each time the batch is mutated)
+//        // to get those that should have expired
+//        NavigableSet<BatchTimeTracker.BatchTime> expiredBatches = batchTimeTracker.getExpiredBatches();
+//
+//        LOGGER.debug("Found {} expired batches", expiredBatches.size());
+//
+//        expiredBatches
+//            .forEach(batchTime -> {
+//                String feedName = batchTime.getFeedName();
+//                final AggregationPolicy aggregationPolicy = aggregationPolicySupplier.getAggregationPolicy(feedName);
+//                final FilePartsBatch currentBatch = keyValueStore.get(batchTime.getFeedName());
+//                if (currentBatch != null) {
+//                    if (aggregationPolicy.isBatchReady(currentBatch)) {
+//                        FilePartsBatch completedBatch = currentBatch.completeBatch();
+//                        LOGGER.debug("Completing new batch, completed batch count: " + completedBatch.getFilePartsCount());
+//                        processorContext.forward(feedName, completedBatch);
+//                        keyValueStore.put(feedName, null);
+//                        batchTimeTracker.remove(feedName);
+//                    } else {
+//                        LOGGER.debug("Batch should be expired but it is not. Feed {}, tracker time {}, batch expired time {}",
+//                                feedName,
+//                                Instant.ofEpochMilli(batchTime.getTimeMs()),
+//                                Instant.ofEpochMilli(aggregationPolicy.getBatchExpiryTimeEpochMs(currentBatch)));
+//                    }
+//                } else {
+//                    LOGGER.debug("Batch for feed {} was in the tracker but has been removed from the store", feedName);
+//                }
+//            });
+//    }
 
     /**
      * Populate the tracker by scanning over all items in the kv store
