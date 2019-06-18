@@ -62,7 +62,6 @@ public class ProxyAggEndToEndExample {
     private final Random random = new Random();
 
     /*
-
     Thoughts:
 
     1. Need to add in a process to walk file tree finding input files that need to be processed.  Add filename to
@@ -88,6 +87,15 @@ public class ProxyAggEndToEndExample {
     1. We need to deal with failure conditions, e.g. files that can't be inspected. The file path would need to
     go onto a bad file topic or similar so the bad file could be moved/logged/etc.
 
+    1. Ideally we want some form of prioritisation of the filePartInfo msgs. We would want some polic(y|ies) to
+    assign a priority based on feedName (and possibly the createTimeMs of the part). This may involve having a
+    topic per priority and then one stream processor group per topic.  Thus certain feeds will get their
+    batches formed sooner than others.  We could then assign different numbers of threads to each priority group
+    though this would mean lots of threads sitting idle if there are no high priority msgs.  We would need
+    some mechanism for work stealing, e.g. the medium processor shunting msgs onto the high topic when it can see
+    the high topic is empty.
+    This may be an option for producing to and consuming from the priority topics
+    https://github.com/magro/kryo-serializers
      */
 
     /**

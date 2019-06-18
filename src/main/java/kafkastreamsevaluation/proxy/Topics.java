@@ -43,13 +43,25 @@ public class Topics {
             filePartsBatchSerde); // feedName -> filePartsBatch
 
     /*
-    Run these to create all the topics
+    Run these to create all the topics with 10 partitions
+
+    kCreateTopic() {
+        topicName="$1"
+        partitionCount="$2"
+        if [ "${partitionCount}x" = "x" ]; then
+            partitionCount=1
+        fi
+        echo "Creating topic [$topicName] with partition count [$partitionCount]"
+        docker exec -i -t kafka bash -c "unset JMX_PORT; /opt/kafka/bin/kafka-topics.sh --create --zookeeper zookeeper:2181/kafka --replication-factor 1 --partitions $partitionCount --topic $topicName"
+    }
+    alias kcreate='kCreateTopic'
 
     kcreate InputFiles 10
     kcreate FilePartConsumedState 10
     kcreate InputFileConsumedState 10
     kcreate FeedToParts 10
     kcreate CompletedBatch 10
+
      */
 
 }
