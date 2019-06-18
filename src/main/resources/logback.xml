@@ -9,7 +9,8 @@
         </encoder>
     </appender>
 
-    <logger name="kafkastreamsevaluation" level="debug"/>
+    <logger name="kafkastreamsevaluation" level="info"/>
+    <logger name="kafkastreamsevaluation.proxy.AggregationPolicy" level="debug"/>
 
     <logger name="org.apache.kafka.streams" level="error"/>
 

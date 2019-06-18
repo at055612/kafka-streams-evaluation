@@ -3,7 +3,7 @@ package kafkastreamsevaluation.proxy.processors;
 import kafkastreamsevaluation.proxy.Constants;
 import kafkastreamsevaluation.proxy.FilePartConsumptionState;
 import kafkastreamsevaluation.proxy.FilePartInfo;
-import kafkastreamsevaluation.proxy.serde.BooleanSerde;
+import kafkastreamsevaluation.proxy.InputFileSplitter;
 import kafkastreamsevaluation.proxy.serde.FilePartConsumptionStateSerde;
 import kafkastreamsevaluation.proxy.serde.FilePartInfoSerde;
 import kafkastreamsevaluation.util.KafkaUtils;
@@ -19,19 +19,19 @@ import org.apache.kafka.streams.kstream.Produced;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 public class InputFileInspector extends AbstractStreamProcessor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(InputFileInspector.class);
 
     private final Properties streamsConfig;
+    private final InputFileSplitter inputFileSplitter;
 
-    public InputFileInspector(final Properties baseStreamsConfig) {
+    public InputFileInspector(final Properties baseStreamsConfig,
+                              final InputFileSplitter inputFileSplitter) {
+        this.inputFileSplitter = inputFileSplitter;
         LOGGER.info("Initialising streams processor {} with appId {}", getName(), getAppId());
         this.streamsConfig = new Properties();
         this.streamsConfig.putAll(baseStreamsConfig);
@@ -45,23 +45,23 @@ public class InputFileInspector extends AbstractStreamProcessor {
     @Override
     public Topology getTopology() {
 
-        Serde<String> stringSerde = Serdes.String();
-        Serde<Boolean> booleanSerde = new BooleanSerde();
-        Serde<byte[]> byteArraySerde = Serdes.ByteArray();
-        Serde<FilePartInfo> filePartInfoSerde = new FilePartInfoSerde();
-        Serde<FilePartConsumptionState> filePartConsumptionStateSerde = new FilePartConsumptionStateSerde();
+        final Serde<String> feedNameSerde = Serdes.String();
+        final Serde<String> inputFilePathSerde = Serdes.String();
+        final Serde<byte[]> byteArraySerde = Serdes.ByteArray();
+        final Serde<FilePartInfo> filePartInfoSerde = new FilePartInfoSerde();
+        final Serde<FilePartConsumptionState> filePartConsumptionStateSerde = new FilePartConsumptionStateSerde();
 
-        StreamsBuilder streamsBuilder = new StreamsBuilder();
+        final StreamsBuilder streamsBuilder = new StreamsBuilder();
 
-        KStream<byte[], String> inputFilePathsStream = streamsBuilder
-                .stream(Constants.INPUT_FILE_TOPIC, Consumed.with(byteArraySerde, stringSerde));
+        final KStream<byte[], String> inputFilePathsStream = streamsBuilder
+                .stream(Constants.INPUT_FILE_TOPIC, Consumed.with(byteArraySerde, inputFilePathSerde));
 
         inputFilePathsStream
                 .peek(KafkaUtils.buildLoggingStreamPeeker(getAppId(), byte[].class, String.class))
                 .flatMap(this::fileInspectorFlatMapper)
-                .through(Constants.FEED_TO_PARTS_TOPIC, Produced.with(stringSerde, filePartInfoSerde))
+                .through(Constants.FEED_TO_PARTS_TOPIC, Produced.with(feedNameSerde, filePartInfoSerde))
                 .map(this::consumedStateMapper)
-                .to(Constants.FILE_PART_CONSUMED_STATE_TOPIC, Produced.with(stringSerde, filePartConsumptionStateSerde));
+                .to(Constants.FILE_PART_CONSUMED_STATE_TOPIC, Produced.with(inputFilePathSerde, filePartConsumptionStateSerde));
 
         return streamsBuilder.build();
     }
@@ -74,19 +74,7 @@ public class InputFileInspector extends AbstractStreamProcessor {
     private Iterable<KeyValue<String, FilePartInfo>> fileInspectorFlatMapper(final byte[] key, final String inputFilePath) {
         Objects.requireNonNull(inputFilePath);
 
-        // TODO replace with code that cracks open the zip and extracts all this info
-        final List<KeyValue<String, FilePartInfo>> keyValues = IntStream.rangeClosed(1, 6)
-                .mapToObj(i -> {
-                    FilePartInfo filePartInfo = new FilePartInfo(
-                        inputFilePath,
-                        "00" + i,
-                        System.currentTimeMillis(),
-                        1024 * i);
-                    String feedName = "FEED_" + i % 3;
-                    return new KeyValue<>(feedName, filePartInfo);
-                })
-                .collect(Collectors.toList());
-        return keyValues;
+        return inputFileSplitter.split(inputFilePath);
     }
 
     /**

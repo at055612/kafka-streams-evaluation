@@ -71,9 +71,13 @@ public class InputFileRemover extends AbstractStreamProcessor {
                         // TODO do we need a store name in here
                         Materialized.with(stringSerde, filePartConsumptionStatesSerde)
                 )
-                .filter((key, value) ->
-                        value != null && value.haveAllBeenConsumed())
                 .toStream()
+                .filter((key, value) -> {
+                    if (LOGGER.isDebugEnabled()) {
+                        LOGGER.debug("{} {}", key, value);
+                    }
+                    return value != null && value.haveAllBeenConsumed();
+                })
                 .foreach((inputFilePath, filePartConsumptionStates) -> {
                     if (filePartConsumptionStates != null && filePartConsumptionStates.haveAllBeenConsumed()) {
                         LOGGER.info("File {} can now be deleted", inputFilePath);

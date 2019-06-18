@@ -40,6 +40,8 @@ public class AggregationPolicy {
 
         long effectiveTotalSize = currentBatch.getTotalSizeBytes() + filePartInfo.getSizeBytes();
         if (effectiveTotalSize >= maxSizeBytes) {
+            LOGGER.debug("Part with size {} is too big to add to batch, current batch size {}",
+                    filePartInfo.getSizeBytes(), currentBatch.getTotalSizeBytes());
             return false;
         }
         return true;

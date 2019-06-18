@@ -1,6 +1,5 @@
 package kafkastreamsevaluation.proxy.processors;
 
-import kafkastreamsevaluation.proxy.AggregationPolicy;
 import kafkastreamsevaluation.proxy.AggregationPolicySupplier;
 import kafkastreamsevaluation.proxy.Constants;
 import kafkastreamsevaluation.proxy.FilePartBatchTransformer;
@@ -22,7 +21,6 @@ import org.apache.kafka.streams.state.Stores;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
 import java.util.Properties;
 
 public class FilePartAggregator extends AbstractStreamProcessor {
@@ -30,9 +28,12 @@ public class FilePartAggregator extends AbstractStreamProcessor {
     private static final Logger LOGGER = LoggerFactory.getLogger(FilePartAggregator.class);
 
     private final Properties streamsConfig;
+    private final AggregationPolicySupplier aggregationPolicySupplier;
 
-    public FilePartAggregator(final Properties baseStreamsConfig) {
+    public FilePartAggregator(final Properties baseStreamsConfig,
+                              final AggregationPolicySupplier aggregationPolicySupplier) {
         LOGGER.info("Initialising streams processor {} with appId {}", getName(), getAppId());
+        this.aggregationPolicySupplier = aggregationPolicySupplier;
         this.streamsConfig = new Properties();
         this.streamsConfig.putAll(baseStreamsConfig);
         this.streamsConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, getAppId());
@@ -44,27 +45,21 @@ public class FilePartAggregator extends AbstractStreamProcessor {
 
     @Override
     public Topology getTopology() {
-        Serde<String> feedNameSerde = Serdes.String();
-        Serde<FilePartInfo> filePartInfoSerde = FilePartInfoSerde.instance();
-        Serde<FilePartsBatch> filePartsBatchSerde = FilePartsBatchSerde.instance();
+        final Serde<String> feedNameSerde = Serdes.String();
+        final Serde<FilePartInfo> filePartInfoSerde = FilePartInfoSerde.instance();
+        final Serde<FilePartsBatch> filePartsBatchSerde = FilePartsBatchSerde.instance();
 
-        String storeName = "feedToCurrentBatchStore";
+        final String storeName = "feedToCurrentBatchStore";
 
-        AggregationPolicy defaultAggregationPolicy = new AggregationPolicy(
-                1024L * 10,
-                3,
-                Duration.ofSeconds(10).toMillis());
-        AggregationPolicySupplier aggregationPolicySupplier = new AggregationPolicySupplier(defaultAggregationPolicy);
-
-        KeyValueBytesStoreSupplier storeSupplier = Stores.persistentKeyValueStore(storeName);
+        final KeyValueBytesStoreSupplier storeSupplier = Stores.persistentKeyValueStore(storeName);
 
         // TODO Hopefully a local store will suffice, but need to consider what happens if we
         // have a multi node proxy cluster and we lose a node mid batch.
         // TODO check the kvstore is backed by a change log topic
-        StoreBuilder<KeyValueStore<String, FilePartsBatch>> feedToCurrentBatchStoreBuilder =
+        final StoreBuilder<KeyValueStore<String, FilePartsBatch>> feedToCurrentBatchStoreBuilder =
                 Stores.keyValueStoreBuilder(storeSupplier, Serdes.String(), filePartsBatchSerde);
 
-        StreamsBuilder streamsBuilder = new StreamsBuilder();
+        final StreamsBuilder streamsBuilder = new StreamsBuilder();
 
         streamsBuilder
                 .addStateStore(feedToCurrentBatchStoreBuilder)

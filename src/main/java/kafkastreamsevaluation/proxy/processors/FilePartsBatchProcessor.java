@@ -46,8 +46,9 @@ public class FilePartsBatchProcessor extends AbstractStreamProcessor {
 
     @Override
     public Topology getTopology() {
-        final Serde<String> stringSerde = Serdes.String();
-        Serde<FilePartsBatch> filePartsBatchSerde = FilePartsBatchSerde.instance();
+        final Serde<String> feedNameSerde = Serdes.String();
+        final Serde<String> inputFilePathSerde = Serdes.String();
+        final Serde<FilePartsBatch> filePartsBatchSerde = FilePartsBatchSerde.instance();
         final Serde<FilePartConsumptionState> filePartConsumptionStateSerde = new FilePartConsumptionStateSerde();
 
         final StreamsBuilder streamsBuilder = new StreamsBuilder();
@@ -55,13 +56,13 @@ public class FilePartsBatchProcessor extends AbstractStreamProcessor {
 
         final KStream<String, FilePartsBatch> completedBatchStream = streamsBuilder
                 .stream(Constants.COMPLETED_BATCH_TOPIC,
-                        Consumed.with(stringSerde, filePartsBatchSerde));
+                        Consumed.with(feedNameSerde, filePartsBatchSerde));
 
         completedBatchStream
                 .flatMap(this::batchConsumer)
                 .to(
                         Constants.FILE_PART_CONSUMED_STATE_TOPIC,
-                        Produced.with(stringSerde, filePartConsumptionStateSerde));
+                        Produced.with(inputFilePathSerde, filePartConsumptionStateSerde));
 
         return streamsBuilder.build();
     }

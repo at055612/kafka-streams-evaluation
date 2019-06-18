@@ -352,7 +352,7 @@ public class KafkaUtils {
 
         return startMessagesConsumer(kafkaConsumer, topics, consumerRecords -> {
                     consumerRecords.forEach(record -> {
-                        LOGGER.info("Received message - \n  topic = {}\n  partition = {}\n  offset = {}\n  key = {}\n  value = {}",
+                        LOGGER.debug("Received message - \n  topic = {}\n  partition = {}\n  offset = {}\n  key = {}\n  value = {}",
                                 record.topic(), record.partition(), record.offset(), record.key().toString(), record.value().toString());
                     });
                 },
@@ -365,7 +365,7 @@ public class KafkaUtils {
 
         return startMessagesConsumer(kafkaConsumer, topics, consumerRecords -> {
             consumerRecords.forEach(record -> {
-                LOGGER.info("Received message - \n  topic = {}\n  partition = {}\n  offset = {}\n  key = {}\n  value = {}",
+                LOGGER.debug("Received message - \n  topic = {}\n  partition = {}\n  offset = {}\n  key = {}\n  value = {}",
                         record.topic(), record.partition(), record.offset(), record.key(), record.value());
             });
         });
@@ -402,7 +402,7 @@ public class KafkaUtils {
                                                                     final Class<K> keyType,
                                                                     final Class<V> valueType) {
         return (k, v) -> {
-            LOGGER.info("Seen message in stream - \n  appId = {}\n  key = {}\n  value = {}",
+            LOGGER.debug("Seen message in stream - \n  appId = {}\n  key = {}\n  value = {}",
                     appId, k.toString(), v.toString());
             //abuse of a predicate as a peek method on the stream, so always return true so the
             //steam is not mutated
@@ -414,7 +414,7 @@ public class KafkaUtils {
                                                                      final Class<K> keyType,
                                                                      final Class<V> valueType) {
         return (k, v) -> {
-            LOGGER.info("Seen message in stream - \n  appId = {}\n  key = {}\n  value = {}",
+            LOGGER.debug("Seen message in stream - \n  appId = {}\n  key = {}\n  value = {}",
                     appId,
                     k == null ? "NULL" : k.toString(),
                     v == null ? "NULL" : v.toString());
