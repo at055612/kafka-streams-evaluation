@@ -93,7 +93,9 @@ public class ProxyAggEndToEndExample {
     batches formed sooner than others.  We could then assign different numbers of threads to each priority group
     though this would mean lots of threads sitting idle if there are no high priority msgs.  We would need
     some mechanism for work stealing, e.g. the medium processor shunting msgs onto the high topic when it can see
-    the high topic is empty.
+    the high topic is empty. For this we would need to track the latest offset of each topic/partition and compare it
+    to the current offset (ProcessorContext gives us current offset but may need a separate consumer to track the latest
+    offsets).
     This may be an option for producing to and consuming from the priority topics
     https://github.com/magro/kryo-serializers
      */
