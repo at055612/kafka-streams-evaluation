@@ -1,4 +1,7 @@
-package kafkastreamsevaluation.proxy;
+package kafkastreamsevaluation.proxy.policy;
+
+import kafkastreamsevaluation.proxy.model.FilePartInfo;
+import kafkastreamsevaluation.proxy.model.FilePartsBatch;
 
 public interface AggregationPolicy {
 

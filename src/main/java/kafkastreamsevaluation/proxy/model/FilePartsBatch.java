@@ -1,4 +1,4 @@
-package kafkastreamsevaluation.proxy;
+package kafkastreamsevaluation.proxy.model;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -66,7 +66,7 @@ public class FilePartsBatch {
         return isComplete;
     }
 
-    long getMinCreationTimeMs() {
+    public long getMinCreationTimeMs() {
         return minCreationTimeMs;
     }
 

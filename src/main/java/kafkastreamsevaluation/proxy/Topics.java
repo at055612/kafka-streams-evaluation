@@ -1,5 +1,8 @@
 package kafkastreamsevaluation.proxy;
 
+import kafkastreamsevaluation.proxy.model.FilePartConsumptionState;
+import kafkastreamsevaluation.proxy.model.FilePartInfo;
+import kafkastreamsevaluation.proxy.model.FilePartsBatch;
 import kafkastreamsevaluation.proxy.serde.FilePartConsumptionStateSerde;
 import kafkastreamsevaluation.proxy.serde.FilePartInfoSerde;
 import kafkastreamsevaluation.proxy.serde.FilePartsBatchSerde;

@@ -10,8 +10,8 @@
     </appender>
 
     <logger name="kafkastreamsevaluation" level="info"/>
-    <logger name="kafkastreamsevaluation.proxy.SizeCountAgeAggregationPolicy" level="debug"/>
-<!--    <logger name="kafkastreamsevaluation.proxy.NoAggregationPolicy" level="debug"/>-->
+    <logger name="kafkastreamsevaluation.proxy.policy.SizeCountAgeAggregationPolicy" level="debug"/>
+<!--    <logger name="kafkastreamsevaluation.proxy.policy.NoAggregationPolicy" level="debug"/>-->
 <!--    <logger name="kafkastreamsevaluation.proxy.FilePartBatchTransformer" level="debug"/>-->
 
     <logger name="org.apache.kafka.streams" level="error"/>

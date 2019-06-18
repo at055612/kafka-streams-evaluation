@@ -1,4 +1,4 @@
-package kafkastreamsevaluation.proxy;
+package kafkastreamsevaluation.proxy.model;
 
 import java.util.HashMap;
 import java.util.List;
@@ -7,7 +7,7 @@ import java.util.Objects;
 
 public class FilePartConsumptionStates {
 
-    // partBaseName -> ref count
+    // partBaseName -> isConsumed
     // Initially false for each part then each part gets true when the batch it is in gets consumed,
     // i.e when it has been added to the stream store or written to a big zip for forwarding.
     private final Map<String, Boolean> consumedStates;

@@ -1,6 +1,6 @@
 package kafkastreamsevaluation.proxy.serde;
 
-import kafkastreamsevaluation.proxy.FilePartConsumptionState;
+import kafkastreamsevaluation.proxy.model.FilePartConsumptionState;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 import org.slf4j.Logger;

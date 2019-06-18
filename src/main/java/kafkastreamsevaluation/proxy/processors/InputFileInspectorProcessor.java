@@ -1,7 +1,7 @@
 package kafkastreamsevaluation.proxy.processors;
 
-import kafkastreamsevaluation.proxy.FilePartConsumptionState;
-import kafkastreamsevaluation.proxy.FilePartInfo;
+import kafkastreamsevaluation.proxy.model.FilePartConsumptionState;
+import kafkastreamsevaluation.proxy.model.FilePartInfo;
 import kafkastreamsevaluation.proxy.InputFileSplitter;
 import kafkastreamsevaluation.proxy.TopicDefinition;
 import kafkastreamsevaluation.proxy.Topics;

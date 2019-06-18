@@ -1,7 +1,7 @@
 package kafkastreamsevaluation.proxy.serde;
 
 import com.esotericsoftware.kryo.pool.KryoPool;
-import kafkastreamsevaluation.proxy.FilePartsBatch;
+import kafkastreamsevaluation.proxy.model.FilePartsBatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

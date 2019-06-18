@@ -1,5 +1,8 @@
 package kafkastreamsevaluation.proxy;
 
+import kafkastreamsevaluation.proxy.model.FilePartInfo;
+import kafkastreamsevaluation.proxy.model.FilePartsBatch;
+import kafkastreamsevaluation.proxy.policy.AggregationPolicy;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.kstream.Transformer;
 import org.apache.kafka.streams.processor.ProcessorContext;

@@ -6,13 +6,11 @@ import com.esotericsoftware.kryo.pool.KryoPool;
 import com.esotericsoftware.kryo.serializers.EnumNameSerializer;
 import de.javakaffee.kryoserializers.CollectionsEmptyListSerializer;
 import de.javakaffee.kryoserializers.CollectionsSingletonListSerializer;
-import kafkastreamsevaluation.proxy.BatchChangeEvent;
-import kafkastreamsevaluation.proxy.BatchKey;
-import kafkastreamsevaluation.proxy.FilePartConsumptionState;
-import kafkastreamsevaluation.proxy.FilePartConsumptionStates;
-import kafkastreamsevaluation.proxy.FilePartInfo;
-import kafkastreamsevaluation.proxy.FilePartRef;
-import kafkastreamsevaluation.proxy.FilePartsBatch;
+import kafkastreamsevaluation.proxy.model.FilePartConsumptionState;
+import kafkastreamsevaluation.proxy.model.FilePartConsumptionStates;
+import kafkastreamsevaluation.proxy.model.FilePartInfo;
+import kafkastreamsevaluation.proxy.model.FilePartRef;
+import kafkastreamsevaluation.proxy.model.FilePartsBatch;
 import org.objenesis.strategy.StdInstantiatorStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,16 +34,13 @@ class KryoPoolHolder {
          kryo.register(ArrayList.class, 11);
          kryo.register(FilePartInfo.class, 12);
          kryo.register(FilePartsBatch.class, 13);
-         kryo.register(BatchChangeEvent.class, 14);
-         registerEnum(kryo, BatchChangeEvent.ChangeType.class, 15);
-         kryo.register(BatchKey.class, 16);
          // custom serialises to deal with private classes
-         kryo.register(Collections.EMPTY_LIST.getClass(), new CollectionsEmptyListSerializer(), 17);
-         kryo.register(Collections.singletonList("").getClass(), new CollectionsSingletonListSerializer(), 18);
-         kryo.register(FilePartRef.class, 19);
-         kryo.register(FilePartConsumptionStates.class, 20);
-         kryo.register(HashMap.class, 21);
-         kryo.register(FilePartConsumptionState.class, 22);
+         kryo.register(Collections.EMPTY_LIST.getClass(), new CollectionsEmptyListSerializer(), 14);
+         kryo.register(Collections.singletonList("").getClass(), new CollectionsSingletonListSerializer(), 15);
+         kryo.register(FilePartRef.class, 16);
+         kryo.register(FilePartConsumptionStates.class, 17);
+         kryo.register(HashMap.class, 18);
+         kryo.register(FilePartConsumptionState.class, 19);
 
          ((Kryo.DefaultInstantiatorStrategy) kryo.getInstantiatorStrategy()).setFallbackInstantiatorStrategy(
                  new StdInstantiatorStrategy());

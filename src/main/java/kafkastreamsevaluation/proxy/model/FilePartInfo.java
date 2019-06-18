@@ -1,4 +1,4 @@
-package kafkastreamsevaluation.proxy;
+package kafkastreamsevaluation.proxy.model;
 
 import java.util.Objects;
 

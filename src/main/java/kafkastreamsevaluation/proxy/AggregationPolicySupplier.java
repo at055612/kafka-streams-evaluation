@@ -1,5 +1,6 @@
 package kafkastreamsevaluation.proxy;
 
+import kafkastreamsevaluation.proxy.policy.AggregationPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

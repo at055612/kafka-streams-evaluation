@@ -1,11 +1,11 @@
 package kafkastreamsevaluation.proxy.main;
 
-import kafkastreamsevaluation.proxy.AggregationPolicy;
+import kafkastreamsevaluation.proxy.policy.AggregationPolicy;
 import kafkastreamsevaluation.proxy.AggregationPolicySupplier;
-import kafkastreamsevaluation.proxy.FilePartInfo;
-import kafkastreamsevaluation.proxy.FilePartsBatch;
-import kafkastreamsevaluation.proxy.NoAggregationPolicy;
-import kafkastreamsevaluation.proxy.SizeCountAgeAggregationPolicy;
+import kafkastreamsevaluation.proxy.model.FilePartInfo;
+import kafkastreamsevaluation.proxy.model.FilePartsBatch;
+import kafkastreamsevaluation.proxy.policy.NoAggregationPolicy;
+import kafkastreamsevaluation.proxy.policy.SizeCountAgeAggregationPolicy;
 import kafkastreamsevaluation.proxy.Topics;
 import kafkastreamsevaluation.proxy.processors.FilePartAggregatorProcessor;
 import kafkastreamsevaluation.proxy.processors.FilePartsBatchProcessor;

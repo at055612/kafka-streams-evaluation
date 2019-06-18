@@ -2,8 +2,8 @@ package kafkastreamsevaluation.proxy.processors;
 
 import kafkastreamsevaluation.proxy.AggregationPolicySupplier;
 import kafkastreamsevaluation.proxy.FilePartBatchTransformer;
-import kafkastreamsevaluation.proxy.FilePartInfo;
-import kafkastreamsevaluation.proxy.FilePartsBatch;
+import kafkastreamsevaluation.proxy.model.FilePartInfo;
+import kafkastreamsevaluation.proxy.model.FilePartsBatch;
 import kafkastreamsevaluation.proxy.TopicDefinition;
 import kafkastreamsevaluation.proxy.Topics;
 import org.apache.kafka.streams.StreamsBuilder;

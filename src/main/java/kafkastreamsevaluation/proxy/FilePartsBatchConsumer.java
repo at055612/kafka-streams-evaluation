@@ -1,5 +1,7 @@
 package kafkastreamsevaluation.proxy;
 
+import kafkastreamsevaluation.proxy.model.FilePartsBatch;
+
 public interface FilePartsBatchConsumer {
 
     /**
