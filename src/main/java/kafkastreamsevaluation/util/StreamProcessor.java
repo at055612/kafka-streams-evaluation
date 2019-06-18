@@ -11,7 +11,7 @@ public interface StreamProcessor {
     void stop();
 
     default String getName() {
-        return this.getClass().getName();
+        return this.getClass().getSimpleName();
     }
 
     Topology getTopology();
