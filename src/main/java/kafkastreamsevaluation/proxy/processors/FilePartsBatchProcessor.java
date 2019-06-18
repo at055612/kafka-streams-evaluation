@@ -1,20 +1,15 @@
 package kafkastreamsevaluation.proxy.processors;
 
-import kafkastreamsevaluation.proxy.Constants;
 import kafkastreamsevaluation.proxy.FilePartConsumptionState;
 import kafkastreamsevaluation.proxy.FilePartsBatch;
 import kafkastreamsevaluation.proxy.FilePartsBatchConsumer;
-import kafkastreamsevaluation.proxy.serde.FilePartConsumptionStateSerde;
-import kafkastreamsevaluation.proxy.serde.FilePartsBatchSerde;
-import org.apache.kafka.common.serialization.Serde;
-import org.apache.kafka.common.serialization.Serdes;
+import kafkastreamsevaluation.proxy.TopicDefinition;
+import kafkastreamsevaluation.proxy.Topics;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.Produced;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,23 +41,19 @@ public class FilePartsBatchProcessor extends AbstractStreamProcessor {
 
     @Override
     public Topology getTopology() {
-        final Serde<String> feedNameSerde = Serdes.String();
-        final Serde<String> inputFilePathSerde = Serdes.String();
-        final Serde<FilePartsBatch> filePartsBatchSerde = FilePartsBatchSerde.instance();
-        final Serde<FilePartConsumptionState> filePartConsumptionStateSerde = new FilePartConsumptionStateSerde();
+
+        final TopicDefinition<String, FilePartsBatch> completedBatchTopic = Topics.COMPLETED_BATCH_TOPIC;
+        final TopicDefinition<String, FilePartConsumptionState> filePartConsumptionStateTopic = Topics.FILE_PART_CONSUMPTION_STATE_TOPIC;
 
         final StreamsBuilder streamsBuilder = new StreamsBuilder();
 
 
         final KStream<String, FilePartsBatch> completedBatchStream = streamsBuilder
-                .stream(Constants.COMPLETED_BATCH_TOPIC,
-                        Consumed.with(feedNameSerde, filePartsBatchSerde));
+                .stream(completedBatchTopic.getName(), completedBatchTopic.getConsumed());
 
         completedBatchStream
                 .flatMap(this::batchConsumer)
-                .to(
-                        Constants.FILE_PART_CONSUMED_STATE_TOPIC,
-                        Produced.with(inputFilePathSerde, filePartConsumptionStateSerde));
+                .to(filePartConsumptionStateTopic.getName(), filePartConsumptionStateTopic.getProduced());
 
         return streamsBuilder.build();
     }

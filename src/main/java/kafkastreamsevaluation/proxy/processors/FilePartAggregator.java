@@ -1,19 +1,14 @@
 package kafkastreamsevaluation.proxy.processors;
 
 import kafkastreamsevaluation.proxy.AggregationPolicySupplier;
-import kafkastreamsevaluation.proxy.Constants;
 import kafkastreamsevaluation.proxy.FilePartBatchTransformer;
 import kafkastreamsevaluation.proxy.FilePartInfo;
 import kafkastreamsevaluation.proxy.FilePartsBatch;
-import kafkastreamsevaluation.proxy.serde.FilePartInfoSerde;
-import kafkastreamsevaluation.proxy.serde.FilePartsBatchSerde;
-import org.apache.kafka.common.serialization.Serde;
-import org.apache.kafka.common.serialization.Serdes;
+import kafkastreamsevaluation.proxy.TopicDefinition;
+import kafkastreamsevaluation.proxy.Topics;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.kstream.Consumed;
-import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.state.KeyValueBytesStoreSupplier;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
@@ -45,9 +40,8 @@ public class FilePartAggregator extends AbstractStreamProcessor {
 
     @Override
     public Topology getTopology() {
-        final Serde<String> feedNameSerde = Serdes.String();
-        final Serde<FilePartInfo> filePartInfoSerde = FilePartInfoSerde.instance();
-        final Serde<FilePartsBatch> filePartsBatchSerde = FilePartsBatchSerde.instance();
+        final TopicDefinition<String, FilePartInfo> feedToPartsTopic = Topics.FEED_TO_PARTS_TOPIC;
+        final TopicDefinition<String, FilePartsBatch> completedBatchTopic = Topics.COMPLETED_BATCH_TOPIC;
 
         final String storeName = "feedToCurrentBatchStore";
 
@@ -57,17 +51,20 @@ public class FilePartAggregator extends AbstractStreamProcessor {
         // have a multi node proxy cluster and we lose a node mid batch.
         // TODO check the kvstore is backed by a change log topic
         final StoreBuilder<KeyValueStore<String, FilePartsBatch>> feedToCurrentBatchStoreBuilder =
-                Stores.keyValueStoreBuilder(storeSupplier, Serdes.String(), filePartsBatchSerde);
+                Stores.keyValueStoreBuilder(
+                        storeSupplier,
+                        completedBatchTopic.getKeySerde(),
+                        completedBatchTopic.getValueSerde());
 
         final StreamsBuilder streamsBuilder = new StreamsBuilder();
 
         streamsBuilder
                 .addStateStore(feedToCurrentBatchStoreBuilder)
-                .stream(Constants.FEED_TO_PARTS_TOPIC, Consumed.with(feedNameSerde, filePartInfoSerde))
+                .stream(feedToPartsTopic.getName(), feedToPartsTopic.getConsumed())
 //                .peek(KafkaUtils.buildLoggingStreamPeeker(BATCH_CREATION_APP_ID, String.class, FilePartInfo.class))
                 .transform(() -> new FilePartBatchTransformer(storeName, aggregationPolicySupplier), storeName)
 //                .peek(KafkaUtils.buildLoggingStreamPeeker(BATCH_CREATION_APP_ID, String.class, FilePartsBatch.class))
-                .to(Constants.COMPLETED_BATCH_TOPIC, Produced.with(feedNameSerde, filePartsBatchSerde));
+                .to(completedBatchTopic.getName(), completedBatchTopic.getProduced());
 
         return streamsBuilder.build();
     }

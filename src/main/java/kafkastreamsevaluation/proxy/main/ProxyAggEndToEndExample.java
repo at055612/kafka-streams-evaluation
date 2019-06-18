@@ -2,10 +2,10 @@ package kafkastreamsevaluation.proxy.main;
 
 import kafkastreamsevaluation.proxy.AggregationPolicy;
 import kafkastreamsevaluation.proxy.AggregationPolicySupplier;
-import kafkastreamsevaluation.proxy.Constants;
 import kafkastreamsevaluation.proxy.FilePartInfo;
 import kafkastreamsevaluation.proxy.FilePartsBatchConsumer;
 import kafkastreamsevaluation.proxy.StreamStoreBatchConsumer;
+import kafkastreamsevaluation.proxy.Topics;
 import kafkastreamsevaluation.proxy.processors.FilePartAggregator;
 import kafkastreamsevaluation.proxy.processors.FilePartsBatchProcessor;
 import kafkastreamsevaluation.proxy.processors.InputFileInspector;
@@ -47,14 +47,21 @@ public class ProxyAggEndToEndExample {
         proxyAggEndToEndExample.run();
     }
 
-    ProxyAggEndToEndExample() {
+    private ProxyAggEndToEndExample() {
 
+        // Set up the input file inspector processor
+        // Reads input file paths from topic, inspects the file and for each puts a list of
+        // file parts onto a file parts topic, keyed by feedname
         final Properties baseStreamsConfig = KafkaUtils.buildStreamsProperties();
 
         final StreamProcessor inputFileInspector = new InputFileInspector(baseStreamsConfig,
                 this::inputFileSplitter);
         allStreamProcessors.add(inputFileInspector);
 
+
+        // Set up the file parts aggregator processor
+        // Reads feedname->filePartInfo msgs and assembles batches grouped by feed
+        // Completed batches are sent to the completed batch topic
         final AggregationPolicy defaultAggregationPolicy = new AggregationPolicy(
                 1024L * 10,
                 3,
@@ -64,6 +71,11 @@ public class ProxyAggEndToEndExample {
         final StreamProcessor filePartsAggregator = new FilePartAggregator(baseStreamsConfig, aggregationPolicySupplier);
         allStreamProcessors.add(filePartsAggregator);
 
+
+        // Set up the batch consumer processor
+        // Reads feedname->completedBatch msgs and for each batch hands it off to a batch consumer
+        // impl.  Once consumed each file part in the batch is marked as complete by putting
+        // a msg to the file part consumption state topic
         // TODO This will need some sort of guice provider arrangement to inject the requiured
         // FilePartsBatchConsumer based on config.
         final FilePartsBatchConsumer filePartsBatchConsumer = new StreamStoreBatchConsumer();
@@ -72,9 +84,12 @@ public class ProxyAggEndToEndExample {
                 baseStreamsConfig, filePartsBatchConsumer);
         allStreamProcessors.add(filePartsBatchProcessor);
 
+
+        // Set up the input file remover processor
+        // Reads the file part consumption state topic and aggregates based on input file path.
+        // When all parts of a file part are makred complete it will delete the input file.
         final StreamProcessor inputFileRemover = new InputFileRemover(baseStreamsConfig);
         allStreamProcessors.add(inputFileRemover);
-
     }
 
     private void run() {
@@ -83,7 +98,7 @@ public class ProxyAggEndToEndExample {
 
         ExecutorService loggerExecutorService = KafkaUtils.startMessageLoggerConsumer(
                 GROUP_ID_BASE + "_loggingConsumer",
-                Arrays.asList(Constants.FEED_TO_PARTS_TOPIC),
+                Arrays.asList(Topics.FEED_TO_PARTS_TOPIC.getName()),
                 Serdes.String(),
                 new FilePartInfoSerde());
 
@@ -126,15 +141,14 @@ public class ProxyAggEndToEndExample {
     private List<ProducerRecord<byte[], String>> buildInputFileTestMessages() {
 
         LOGGER.info("Putting {} input files on the topic (total parts {})",
-                INPUT_FILE_COUNT, INPUT_FILE_COUNT * PARTS_PER_INPUT_FILE);
+                INPUT_FILE_COUNT,
+                INPUT_FILE_COUNT * PARTS_PER_INPUT_FILE);
 
         return IntStream.rangeClosed(1, INPUT_FILE_COUNT)
-                .mapToObj(i -> {
-                    ProducerRecord<byte[], String> record = new ProducerRecord<>(
-                            Constants.INPUT_FILE_TOPIC,
-                            "/some/path/file_" + i);
-                    return record;
-                })
+                .mapToObj(i ->
+                        new ProducerRecord<byte[], String>(
+                                Topics.INPUT_FILE_TOPIC.getName(),
+                                "/some/path/file_" + i))
                 .collect(Collectors.toList());
     }
 

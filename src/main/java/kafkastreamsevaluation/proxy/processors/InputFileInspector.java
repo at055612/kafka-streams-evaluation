@@ -1,21 +1,16 @@
 package kafkastreamsevaluation.proxy.processors;
 
-import kafkastreamsevaluation.proxy.Constants;
 import kafkastreamsevaluation.proxy.FilePartConsumptionState;
 import kafkastreamsevaluation.proxy.FilePartInfo;
 import kafkastreamsevaluation.proxy.InputFileSplitter;
-import kafkastreamsevaluation.proxy.serde.FilePartConsumptionStateSerde;
-import kafkastreamsevaluation.proxy.serde.FilePartInfoSerde;
+import kafkastreamsevaluation.proxy.TopicDefinition;
+import kafkastreamsevaluation.proxy.Topics;
 import kafkastreamsevaluation.util.KafkaUtils;
-import org.apache.kafka.common.serialization.Serde;
-import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.Produced;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,23 +40,21 @@ public class InputFileInspector extends AbstractStreamProcessor {
     @Override
     public Topology getTopology() {
 
-        final Serde<String> feedNameSerde = Serdes.String();
-        final Serde<String> inputFilePathSerde = Serdes.String();
-        final Serde<byte[]> byteArraySerde = Serdes.ByteArray();
-        final Serde<FilePartInfo> filePartInfoSerde = new FilePartInfoSerde();
-        final Serde<FilePartConsumptionState> filePartConsumptionStateSerde = new FilePartConsumptionStateSerde();
-
         final StreamsBuilder streamsBuilder = new StreamsBuilder();
 
+        final TopicDefinition<byte[], String> inputFileTopic = Topics.INPUT_FILE_TOPIC;
+        final TopicDefinition<String, FilePartInfo> feedToPartsTopic = Topics.FEED_TO_PARTS_TOPIC;
+        final TopicDefinition<String, FilePartConsumptionState> filePartConsumptionStateTopic = Topics.FILE_PART_CONSUMPTION_STATE_TOPIC;
+
         final KStream<byte[], String> inputFilePathsStream = streamsBuilder
-                .stream(Constants.INPUT_FILE_TOPIC, Consumed.with(byteArraySerde, inputFilePathSerde));
+                .stream(inputFileTopic.getName(), inputFileTopic.getConsumed());
 
         inputFilePathsStream
                 .peek(KafkaUtils.buildLoggingStreamPeeker(getAppId(), byte[].class, String.class))
                 .flatMap(this::fileInspectorFlatMapper)
-                .through(Constants.FEED_TO_PARTS_TOPIC, Produced.with(feedNameSerde, filePartInfoSerde))
+                .through(feedToPartsTopic.getName(), feedToPartsTopic.getProduced())
                 .map(this::consumedStateMapper)
-                .to(Constants.FILE_PART_CONSUMED_STATE_TOPIC, Produced.with(inputFilePathSerde, filePartConsumptionStateSerde));
+                .to(filePartConsumptionStateTopic.getName(), filePartConsumptionStateTopic.getProduced());
 
         return streamsBuilder.build();
     }

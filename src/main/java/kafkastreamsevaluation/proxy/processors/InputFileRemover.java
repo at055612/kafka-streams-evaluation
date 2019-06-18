@@ -1,19 +1,17 @@
 package kafkastreamsevaluation.proxy.processors;
 
-import kafkastreamsevaluation.proxy.Constants;
 import kafkastreamsevaluation.proxy.FilePartConsumptionState;
 import kafkastreamsevaluation.proxy.FilePartConsumptionStates;
-import kafkastreamsevaluation.proxy.serde.FilePartConsumptionStateSerde;
+import kafkastreamsevaluation.proxy.TopicDefinition;
+import kafkastreamsevaluation.proxy.Topics;
 import kafkastreamsevaluation.proxy.serde.FilePartConsumptionStatesSerde;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Materialized;
-import org.apache.kafka.streams.kstream.Serialized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,18 +38,16 @@ public class InputFileRemover extends AbstractStreamProcessor {
     @Override
     public Topology getTopology() {
         final Serde<String> stringSerde = Serdes.String();
-//        final Serde<Boolean> booleanSerde = new BooleanSerde();
-//        final Serde<FilePartRef> filePartRefSerde = new FilePartRefSerde();
         final Serde<FilePartConsumptionStates> filePartConsumptionStatesSerde = new FilePartConsumptionStatesSerde();
-        final Serde<FilePartConsumptionState> filePartConsumptionStateSerde = new FilePartConsumptionStateSerde();
+
+        final TopicDefinition<String, FilePartConsumptionState> filePartConsumptionStateTopic = Topics.FILE_PART_CONSUMPTION_STATE_TOPIC;
 
         final StreamsBuilder streamsBuilder = new StreamsBuilder();
 
         // TODO need to ensure there is no compaction/caching of this topic as this is not
         // a changelog and thus each msg value matters
         final KStream<String, FilePartConsumptionState> filePartConsumedStateStream = streamsBuilder
-                .stream(Constants.FILE_PART_CONSUMED_STATE_TOPIC,
-                        Consumed.with(stringSerde, filePartConsumptionStateSerde));
+                .stream(filePartConsumptionStateTopic.getName(), filePartConsumptionStateTopic.getConsumed());
 
 //        final KTable<String, FilePartConsumptionStates> filePartConsumedStatesTable = streamsBuilder
 //                .table(Constants.INPUT_FILE_CONSUMED_STATE_TOPIC,
@@ -63,7 +59,7 @@ public class InputFileRemover extends AbstractStreamProcessor {
 //            aggregate.put(value.getPartBaseName(), value.isConsumed());
 
         filePartConsumedStateStream
-                .groupByKey(Serialized.with(stringSerde, filePartConsumptionStateSerde))
+                .groupByKey(filePartConsumptionStateTopic.getSerialized())
                 .aggregate(
                         FilePartConsumptionStates::new,
                         (key, value, aggregate) ->
