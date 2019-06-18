@@ -102,13 +102,18 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
         }
 
         // Update the batch held in the store for the next message for this feedname
-        keyValueStore.put(feedName, newStoreBatch);
-        // Update the time we expect the batch to have expired on, or remove it from the tracker
-        if (newStoreBatch != null) {
-            batchTimeTracker.put(feedName, aggregationPolicy.getBatchExpiryTimeEpochMs(newStoreBatch));
+        if (currentStoreBatch == null && newStoreBatch == null) {
+            LOGGER.debug("Both current and new batches are null, so not writing to store");
         } else {
-            batchTimeTracker.remove(feedName);
+            keyValueStore.put(feedName, newStoreBatch);
         }
+
+        // Update the time we expect the batch to have expired on, or remove it from the tracker
+//        if (newStoreBatch != null) {
+//            batchTimeTracker.put(feedName, aggregationPolicy.getBatchExpiryTimeEpochMs(newStoreBatch));
+//        } else {
+//            batchTimeTracker.remove(feedName);
+//        }
 
         // send our completed batch(es) (if any) downstream
         completedBatches.forEach(completedBatch ->

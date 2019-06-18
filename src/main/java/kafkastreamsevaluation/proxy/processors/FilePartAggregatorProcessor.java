@@ -18,15 +18,15 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
 
-public class FilePartAggregator extends AbstractStreamProcessor {
+public class FilePartAggregatorProcessor extends AbstractStreamProcessor {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(FilePartAggregator.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(FilePartAggregatorProcessor.class);
 
     private final Properties streamsConfig;
     private final AggregationPolicySupplier aggregationPolicySupplier;
 
-    public FilePartAggregator(final Properties baseStreamsConfig,
-                              final AggregationPolicySupplier aggregationPolicySupplier) {
+    public FilePartAggregatorProcessor(final Properties baseStreamsConfig,
+                                       final AggregationPolicySupplier aggregationPolicySupplier) {
         LOGGER.info("Initialising streams processor {} with appId {}", getName(), getAppId());
         this.aggregationPolicySupplier = aggregationPolicySupplier;
         this.streamsConfig = new Properties();

@@ -17,15 +17,15 @@ import org.slf4j.LoggerFactory;
 import java.util.Objects;
 import java.util.Properties;
 
-public class InputFileInspector extends AbstractStreamProcessor {
+public class InputFileInspectorProcessor extends AbstractStreamProcessor {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(InputFileInspector.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(InputFileInspectorProcessor.class);
 
     private final Properties streamsConfig;
     private final InputFileSplitter inputFileSplitter;
 
-    public InputFileInspector(final Properties baseStreamsConfig,
-                              final InputFileSplitter inputFileSplitter) {
+    public InputFileInspectorProcessor(final Properties baseStreamsConfig,
+                                       final InputFileSplitter inputFileSplitter) {
         this.inputFileSplitter = inputFileSplitter;
         LOGGER.info("Initialising streams processor {} with appId {}", getName(), getAppId());
         this.streamsConfig = new Properties();

@@ -23,9 +23,12 @@ public class StreamStoreBatchConsumer implements FilePartsBatchConsumer {
 
         batchCounter.incrementAndGet();
         partCounter.addAndGet(filePartsBatch.getFilePartsCount());
-        LOGGER.info("Writing {} {} to the stream store. Total batch count: {}, total part Count {}",
+        LOGGER.info(
+                "Writing feed:{} count:{} bytes:{} age:{} to the stream store. Total batch count: {}, total part Count {}",
                 feedName,
                 filePartsBatch.getFilePartsCount(),
+                filePartsBatch.getTotalSizeBytes(),
+                filePartsBatch.getAgeMs(),
                 batchCounter,
                 partCounter);
 

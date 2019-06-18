@@ -1,11 +1,11 @@
 package kafkastreamsevaluation.proxy.main;
 
 import com.google.common.collect.Maps;
-import kafkastreamsevaluation.proxy.AggregationPolicy;
 import kafkastreamsevaluation.proxy.AggregationPolicySupplier;
 import kafkastreamsevaluation.proxy.FilePartBatchTransformer;
 import kafkastreamsevaluation.proxy.FilePartInfo;
 import kafkastreamsevaluation.proxy.FilePartsBatch;
+import kafkastreamsevaluation.proxy.SizeCountAgeAggregationPolicy;
 import kafkastreamsevaluation.proxy.serde.FilePartInfoSerde;
 import kafkastreamsevaluation.proxy.serde.FilePartsBatchSerde;
 import kafkastreamsevaluation.util.KafkaUtils;
@@ -229,7 +229,7 @@ public class ProxyAggBatchingExampleWithTransformer {
 
         String storeName = "feedToCurrentBatchStore";
 
-        AggregationPolicy defaultAggregationPolicy = new AggregationPolicy(
+        SizeCountAgeAggregationPolicy defaultAggregationPolicy = new SizeCountAgeAggregationPolicy(
                 1024L * 10,
                 3,
                 Duration.ofSeconds(10).toMillis());

@@ -4,12 +4,14 @@ import kafkastreamsevaluation.proxy.AggregationPolicy;
 import kafkastreamsevaluation.proxy.AggregationPolicySupplier;
 import kafkastreamsevaluation.proxy.FilePartInfo;
 import kafkastreamsevaluation.proxy.FilePartsBatchConsumer;
+import kafkastreamsevaluation.proxy.NoAggregationPolicy;
+import kafkastreamsevaluation.proxy.SizeCountAgeAggregationPolicy;
 import kafkastreamsevaluation.proxy.StreamStoreBatchConsumer;
 import kafkastreamsevaluation.proxy.Topics;
-import kafkastreamsevaluation.proxy.processors.FilePartAggregator;
+import kafkastreamsevaluation.proxy.processors.FilePartAggregatorProcessor;
 import kafkastreamsevaluation.proxy.processors.FilePartsBatchProcessor;
-import kafkastreamsevaluation.proxy.processors.InputFileInspector;
-import kafkastreamsevaluation.proxy.processors.InputFileRemover;
+import kafkastreamsevaluation.proxy.processors.InputFileInspectorProcessor;
+import kafkastreamsevaluation.proxy.processors.InputFileRemoverProcessor;
 import kafkastreamsevaluation.proxy.serde.FilePartInfoSerde;
 import kafkastreamsevaluation.util.KafkaUtils;
 import kafkastreamsevaluation.util.StreamProcessor;
@@ -23,8 +25,14 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -37,10 +45,16 @@ public class ProxyAggEndToEndExample {
 
     private static final String GROUP_ID_BASE = ProxyAggBatchingExampleWithTransformer.class.getSimpleName();
 
-    public static final int INPUT_FILE_COUNT = 100;
-    public static final int PARTS_PER_INPUT_FILE = 6;
+    private static final int INPUT_FILE_COUNT = 100;
+    private static final int PARTS_PER_INPUT_FILE = 8;
+    private static final int FEEDS_PER_INPUT_FILE = 4;
+    private static final String FEED_PREFIX = "FEED_";
 
     private final List<StreamProcessor> allStreamProcessors = new ArrayList<>();
+
+    private final Set<String> inputhFilePaths = new HashSet<>();
+
+    private final Random random = new Random();
 
     public static void main(String[] args) {
         ProxyAggEndToEndExample proxyAggEndToEndExample = new ProxyAggEndToEndExample();
@@ -54,7 +68,8 @@ public class ProxyAggEndToEndExample {
         // file parts onto a file parts topic, keyed by feedname
         final Properties baseStreamsConfig = KafkaUtils.buildStreamsProperties();
 
-        final StreamProcessor inputFileInspector = new InputFileInspector(baseStreamsConfig,
+        final StreamProcessor inputFileInspector = new InputFileInspectorProcessor(
+                baseStreamsConfig,
                 this::inputFileSplitter);
         allStreamProcessors.add(inputFileInspector);
 
@@ -62,13 +77,11 @@ public class ProxyAggEndToEndExample {
         // Set up the file parts aggregator processor
         // Reads feedname->filePartInfo msgs and assembles batches grouped by feed
         // Completed batches are sent to the completed batch topic
-        final AggregationPolicy defaultAggregationPolicy = new AggregationPolicy(
-                1024L * 10,
-                3,
-                Duration.ofSeconds(10).toMillis());
-        final AggregationPolicySupplier aggregationPolicySupplier = new AggregationPolicySupplier(defaultAggregationPolicy);
+        final AggregationPolicySupplier aggregationPolicySupplier = buildAggregationPolicies();
 
-        final StreamProcessor filePartsAggregator = new FilePartAggregator(baseStreamsConfig, aggregationPolicySupplier);
+        final StreamProcessor filePartsAggregator = new FilePartAggregatorProcessor(
+                baseStreamsConfig,
+                aggregationPolicySupplier);
         allStreamProcessors.add(filePartsAggregator);
 
 
@@ -81,16 +94,20 @@ public class ProxyAggEndToEndExample {
         final FilePartsBatchConsumer filePartsBatchConsumer = new StreamStoreBatchConsumer();
 
         final StreamProcessor filePartsBatchProcessor = new FilePartsBatchProcessor(
-                baseStreamsConfig, filePartsBatchConsumer);
+                baseStreamsConfig,
+                filePartsBatchConsumer);
         allStreamProcessors.add(filePartsBatchProcessor);
 
 
         // Set up the input file remover processor
         // Reads the file part consumption state topic and aggregates based on input file path.
         // When all parts of a file part are makred complete it will delete the input file.
-        final StreamProcessor inputFileRemover = new InputFileRemover(baseStreamsConfig);
+        final StreamProcessor inputFileRemover = new InputFileRemoverProcessor(
+                baseStreamsConfig,
+                this::removeInputFile);
         allStreamProcessors.add(inputFileRemover);
     }
+
 
     private void run() {
 
@@ -138,6 +155,29 @@ public class ProxyAggEndToEndExample {
         });
     }
 
+    private AggregationPolicySupplier buildAggregationPolicies() {
+
+        final AggregationPolicy defaultAggregationPolicy = new SizeCountAgeAggregationPolicy(
+                1000L * 20,
+                500,
+                Duration.ofSeconds(10).toMillis());
+
+        final AggregationPolicy partCountLimitedAggregationPolicy = new SizeCountAgeAggregationPolicy(
+                Long.MAX_VALUE,
+                20,
+                Duration.ofSeconds(10).toMillis());
+
+        final AggregationPolicy noAggregationPolicy = NoAggregationPolicy.getInstance();
+
+        final Map<String, AggregationPolicy> aggregationPolicyMap = new HashMap<>();
+
+        // Make FEED_1 go straight through with no aggregation
+        aggregationPolicyMap.put(FEED_PREFIX + "1", noAggregationPolicy);
+        aggregationPolicyMap.put(FEED_PREFIX + "2", partCountLimitedAggregationPolicy);
+
+        return new AggregationPolicySupplier(defaultAggregationPolicy, aggregationPolicyMap);
+    }
+
     private List<ProducerRecord<byte[], String>> buildInputFileTestMessages() {
 
         LOGGER.info("Putting {} input files on the topic (total parts {})",
@@ -145,10 +185,13 @@ public class ProxyAggEndToEndExample {
                 INPUT_FILE_COUNT * PARTS_PER_INPUT_FILE);
 
         return IntStream.rangeClosed(1, INPUT_FILE_COUNT)
-                .mapToObj(i ->
-                        new ProducerRecord<byte[], String>(
+                .mapToObj(i -> {
+                        String inputFilePath = "/some/path/file_" + i;
+                        inputhFilePaths.add(inputFilePath);
+                        return new ProducerRecord<byte[], String>(
                                 Topics.INPUT_FILE_TOPIC.getName(),
-                                "/some/path/file_" + i))
+                                inputFilePath);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -164,12 +207,20 @@ public class ProxyAggEndToEndExample {
                             inputFilePath,
                             "00" + i,
                             System.currentTimeMillis(),
-                            1024 * i);
-                    String feedName = "FEED_" + i % 3;
+                            1000 + (random.nextInt(5) * 1000));
+                    String feedName = FEED_PREFIX + i % FEEDS_PER_INPUT_FILE;
                     return new KeyValue<>(feedName, filePartInfo);
                 })
                 .collect(Collectors.toList());
+
+        // shuffle them to provide a bit of inconsistency
+        Collections.shuffle(keyValues);
         return keyValues;
+    }
+
+    private void removeInputFile(final String inputFilePath) {
+        inputhFilePaths.remove(inputFilePath);
+        LOGGER.info("'Deleted' file {}, remaining files: {}", inputFilePath, inputhFilePaths.size());
     }
 
 

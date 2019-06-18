@@ -42,11 +42,11 @@ public class Topics {
     /*
     Run these to create all the topics
 
-    kcreate InputFiles
-    kcreate FilePartConsumedState
-    kcreate InputFileConsumedState
-    kcreate FeedToParts
-    kcreate CompletedBatch
+    kcreate InputFiles 10
+    kcreate FilePartConsumedState 10
+    kcreate InputFileConsumedState 10
+    kcreate FeedToParts 10
+    kcreate CompletedBatch 10
      */
 
 }

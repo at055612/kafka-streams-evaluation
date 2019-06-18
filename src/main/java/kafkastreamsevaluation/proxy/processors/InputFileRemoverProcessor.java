@@ -4,6 +4,7 @@ import kafkastreamsevaluation.proxy.FilePartConsumptionState;
 import kafkastreamsevaluation.proxy.FilePartConsumptionStates;
 import kafkastreamsevaluation.proxy.TopicDefinition;
 import kafkastreamsevaluation.proxy.Topics;
+import kafkastreamsevaluation.proxy.InputFileRemover;
 import kafkastreamsevaluation.proxy.serde.FilePartConsumptionStatesSerde;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
@@ -17,13 +18,16 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
 
-public class InputFileRemover extends AbstractStreamProcessor {
+public class InputFileRemoverProcessor extends AbstractStreamProcessor {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(InputFileRemover.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(InputFileRemoverProcessor.class);
 
     private final Properties streamsConfig;
+    private final InputFileRemover inputFileRemover;
 
-    public InputFileRemover(final Properties baseStreamsConfig) {
+    public InputFileRemoverProcessor(final Properties baseStreamsConfig,
+                                     final InputFileRemover inputFileRemover) {
+        this.inputFileRemover = inputFileRemover;
         LOGGER.info("Initialising streams processor {} with appId {}", getName(), getAppId());
         this.streamsConfig = new Properties();
         this.streamsConfig.putAll(baseStreamsConfig);
@@ -76,12 +80,15 @@ public class InputFileRemover extends AbstractStreamProcessor {
                 })
                 .foreach((inputFilePath, filePartConsumptionStates) -> {
                     if (filePartConsumptionStates != null && filePartConsumptionStates.haveAllBeenConsumed()) {
-                        LOGGER.info("File {} can now be deleted", inputFilePath);
+                        LOGGER.debug("File {} can now be deleted", inputFilePath);
+                        // TODO implement the actual file deletion
+
+                        inputFileRemover.remove(inputFilePath);
+
                     } else {
                         LOGGER.error("Shouldn't get here!!! {} {}", inputFilePath, filePartConsumptionStates);
                     }
 
-                    // TODO implement the actual file deletion
 
                     // TODO may want to tombstone the aggregate topic as we no longer need the value
                 });
