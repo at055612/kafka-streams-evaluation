@@ -46,12 +46,25 @@ public class SizeCountAgeAggregationPolicy implements AggregationPolicy {
         // before trying to add something to it.
 
         long effectiveTotalSize = currentBatch.getTotalSizeBytes() + filePartInfo.getSizeBytes();
-        if (effectiveTotalSize >= maxSizeBytes) {
+        if (effectiveTotalSize > maxSizeBytes) {
             LOGGER.debug("Part with size {} is too big to add to batch, current batch size {}",
                     filePartInfo.getSizeBytes(), currentBatch.getTotalSizeBytes());
             return false;
+        } else if (currentBatch.getFilePartsCount() >= maxFileParts) {
+            return false;
         }
         return true;
+    }
+
+    /**
+     * @param filePartInfo
+     * @return False if filePartInfo would breach the policy on its own
+     */
+    @Override
+    public boolean canPartBeAddedToBatch(final FilePartInfo filePartInfo) {
+        Objects.requireNonNull(filePartInfo);
+
+        return filePartInfo.getSizeBytes() < maxSizeBytes;
     }
 
     /**

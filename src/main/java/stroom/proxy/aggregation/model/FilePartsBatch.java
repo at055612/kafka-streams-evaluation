@@ -7,6 +7,7 @@ import java.util.Objects;
 
 public class FilePartsBatch {
 
+    // TODO could consider getting rid of this as it doesn't add a lot
     private final boolean isComplete;
     private final long minCreationTimeMs;
     private final long totalSizeBytes;

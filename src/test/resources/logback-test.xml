@@ -10,9 +10,10 @@
     </appender>
 
     <logger name="kafkastreamsevaluation" level="info"/>
-    <logger name="stroom" level="debug"/>
+    <logger name="stroom" level="info"/>
 
     <root level="error">
         <appender-ref ref="STDOUT" />
     </root>
+
 </configuration>

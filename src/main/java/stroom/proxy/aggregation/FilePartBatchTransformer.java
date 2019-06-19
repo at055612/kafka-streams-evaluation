@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.LongAdder;
 
 public class FilePartBatchTransformer implements Transformer<String, FilePartInfo, KeyValue<String, FilePartsBatch>> {
@@ -58,50 +59,44 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
 
     @Override
     public KeyValue<String, FilePartsBatch> transform(final String feedName, final FilePartInfo filePartInfo) {
+        Objects.requireNonNull(feedName);
+        Objects.requireNonNull(filePartInfo);
 
         FilePartsBatch currentStoreBatch = keyValueStore.get(feedName);
         final AggregationPolicy aggregationPolicy = aggregationPolicySupplier.getAggregationPolicy(feedName);
 
-        LOGGER.debug("transform called for feed: {}, filePart: {}, current batch size: {}",
-                feedName,
-                filePartInfo.getBaseName(),
-                currentStoreBatch == null ? "-" : currentStoreBatch.getFilePartsCount());
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("transform called for feed: {}, filePart: {}, current batch size: {}",
+                    feedName,
+                    filePartInfo.getBaseName(),
+                    currentStoreBatch == null ? "-" : currentStoreBatch.getFilePartsCount());
+        }
 
         List<FilePartsBatch> completedBatches = new ArrayList<>();
         FilePartsBatch newStoreBatch;
 
         if (currentStoreBatch == null) {
             // no batch for this feed so create one
-            newStoreBatch = new FilePartsBatch(filePartInfo, false);
+            newStoreBatch = createNewBatch(completedBatches, filePartInfo, aggregationPolicy);
 
             LOGGER.debug("Created new batch, count: " + newStoreBatch.getFilePartsCount());
         } else {
             if (aggregationPolicy.isBatchReady(currentStoreBatch)
                     || !aggregationPolicy.canPartBeAddedToBatch(currentStoreBatch, filePartInfo)) {
 
-                // completed batch can be output for onward processing
+                // existing batch can be completed and output for onward processing
                 FilePartsBatch completedBatch = currentStoreBatch.completeBatch();
                 completedBatches.add(completedBatch);
 
                 LOGGER.debug("Completing existing batch, completed batch count: " + completedBatch.getFilePartsCount());
-                newStoreBatch = new FilePartsBatch(filePartInfo, false);
+                newStoreBatch = createNewBatch(completedBatches, filePartInfo, aggregationPolicy);
 
                 LOGGER.debug("Created new batch, count: " + newStoreBatch.getFilePartsCount());
             } else {
-                // The part has been tested to ensure it wont blow any limits so just add it.
+                // The file part has been tested to ensure it wont blow any limits so just add it.
                 newStoreBatch = currentStoreBatch.addFilePart(filePartInfo);
                 LOGGER.debug("Added to existing batch, new count: " + newStoreBatch.getFilePartsCount());
             }
-        }
-
-        if (aggregationPolicy.isBatchReady(newStoreBatch)) {
-            // The single part has immediately made a ready batch so complete it and put a null
-            // into the store
-            FilePartsBatch completedBatch = newStoreBatch.completeBatch();
-            LOGGER.debug("Completing new batch, completed batch count: " + completedBatch.getFilePartsCount());
-            completedBatches.add(newStoreBatch);
-            LOGGER.debug("Setting store value to null");
-            newStoreBatch = null;
         }
 
         // Update the batch held in the store for the next message for this feedname
@@ -119,11 +114,39 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
 //        }
 
         // send our completed batch(es) (if any) downstream
-        completedBatches.forEach(completedBatch ->
-                processorContext.forward(feedName, completedBatch));
+        completedBatches.forEach(completedBatch -> {
+                if (!completedBatch.isComplete()) {
+                    throw new RuntimeException("This should not happen");
+                }
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("Forwarding completed batch for feed {} with part count {}",
+                            feedName, completedBatch.getFilePartsCount());
+                }
+                processorContext.forward(feedName, completedBatch);
+        });
 
-        // Just return null as we have sent stuff downstream manually using .forward
+        // Just return null as we have sent stuff downstream manually using forward()
         return null;
+    }
+
+    /**
+     * @return A new incomplete batch containing the passed filePartInfo, else return null and add a brand new
+     * completed batch to completedBatches.
+     */
+    private FilePartsBatch createNewBatch(
+            final List<FilePartsBatch> completedBatches,
+            final FilePartInfo filePartInfo,
+            final AggregationPolicy aggregationPolicy) {
+        FilePartsBatch incompleteBatch = null;
+        if (!aggregationPolicy.canPartBeAddedToBatch(filePartInfo)) {
+            // make a completed batch and add to the list of completed batches
+            LOGGER.debug("Creating new completed batch with part {}", filePartInfo);
+            completedBatches.add(new FilePartsBatch(filePartInfo, true));
+        } else {
+            LOGGER.debug("Creating new incomplete batch with part {}", filePartInfo);
+            incompleteBatch = new FilePartsBatch(filePartInfo, false);
+        }
+        return incompleteBatch;
     }
 
     @Override

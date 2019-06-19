@@ -27,15 +27,15 @@ public class Topics {
             byteArraySerde,
             stringSerde); // null -> inputFilePath
 
-    public static final TopicDefinition<String, FilePartConsumptionState> FILE_PART_CONSUMPTION_STATE_TOPIC = new TopicDefinition<>(
-            "FilePartConsumedState",
-            stringSerde,
-            filePartConsumptionStateSerde); // inputFilePath -> partBaseName|isConsumed
-
     public static final TopicDefinition<String, FilePartInfo> FEED_TO_PARTS_TOPIC = new TopicDefinition<>(
             "FeedToParts",
             stringSerde,
             filePartInfoSerde); // feedName -> filePartInfo
+
+    public static final TopicDefinition<String, FilePartConsumptionState> FILE_PART_CONSUMPTION_STATE_TOPIC = new TopicDefinition<>(
+            "FilePartConsumedState",
+            stringSerde,
+            filePartConsumptionStateSerde); // inputFilePath -> partBaseName|isConsumed
 
     public static final TopicDefinition<String, FilePartsBatch> COMPLETED_BATCH_TOPIC = new TopicDefinition<>(
             "CompletedBatch",

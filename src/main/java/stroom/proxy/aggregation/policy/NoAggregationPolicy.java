@@ -38,6 +38,15 @@ public class NoAggregationPolicy implements AggregationPolicy {
     }
 
     /**
+     * @param filePartInfo
+     * @return False if filePartInfo would breach the policy on its own
+     */
+    @Override
+    public boolean canPartBeAddedToBatch(final FilePartInfo filePartInfo) {
+        return true;
+    }
+
+    /**
      * @return The time in epcoh MS that the passed filePartsBatch will be deemed ready for completion
      */
     @Override

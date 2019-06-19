@@ -113,7 +113,7 @@ public class KafkaUtils {
         //but means the consumers need to be started before anything puts new messages on the topic.
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
 
-        props.put("cache.max.bytes.buffering", 0L);
+//        props.put("cache.max.bytes.buffering", 0L);
 
         //if multiple users are running streams on the same box they will get IO errors if they use the
         //sae state dir
