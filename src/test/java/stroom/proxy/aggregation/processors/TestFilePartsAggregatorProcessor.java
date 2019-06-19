@@ -36,7 +36,6 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
     private static final Logger LOGGER = LoggerFactory.getLogger(TestFilePartsAggregatorProcessor.class);
 
     private static final int PARTS_PER_INPUT_FILE = 8;
-    private static final int FEEDS_PER_INPUT_FILE = 4;
     private static final String FEED_PREFIX = "FEED_";
     private static final String FEED_1 = FEED_PREFIX + "1";
     private static final String FEED_NO_AGGREGATION = FEED_PREFIX + "NO_AGGREGATION";
@@ -57,15 +56,19 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
     private final TopicDefinition<String, FilePartInfo> feedToPartsTopic = Topics.FEED_TO_PARTS_TOPIC;
     private final TopicDefinition<String, FilePartsBatch> completedBatchTopic = Topics.COMPLETED_BATCH_TOPIC;
 
+
+    // TODO add a test that sends one part for each feed then uses the test driver to advance the time to
+    // see if the batches get aged off by their policies
+
     @Test
     public void testFileSplitting() {
 
-//        KafkaUtils.sleep(9_000);
-
         runProcessorTest(feedToPartsTopic, (testDriver, consumerRecordFactory) -> {
 
+            // submit the test msgs to the topic
             sendInputData(testDriver, consumerRecordFactory);
 
+            // get all the completed batches off the output topic
             List<ProducerRecord<String, FilePartsBatch>> filePartRecords = readAllProducerRecords(
                     completedBatchTopic, testDriver);
 
