@@ -1,16 +1,5 @@
 package stroom.proxy.aggregation.main;
 
-import stroom.proxy.aggregation.policy.AggregationPolicy;
-import stroom.proxy.aggregation.AggregationPolicySupplier;
-import stroom.proxy.aggregation.model.FilePartInfo;
-import stroom.proxy.aggregation.model.FilePartsBatch;
-import stroom.proxy.aggregation.policy.NoAggregationPolicy;
-import stroom.proxy.aggregation.policy.SizeCountAgeAggregationPolicy;
-import stroom.proxy.aggregation.Topics;
-import stroom.proxy.aggregation.processors.FilePartAggregatorProcessor;
-import stroom.proxy.aggregation.processors.FilePartsBatchProcessor;
-import stroom.proxy.aggregation.processors.InputFileInspectorProcessor;
-import stroom.proxy.aggregation.processors.InputFileRemoverProcessor;
 import kafkastreamsevaluation.util.KafkaUtils;
 import kafkastreamsevaluation.util.StreamProcessor;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -19,6 +8,17 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KeyValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import stroom.proxy.aggregation.AggregationPolicySupplier;
+import stroom.proxy.aggregation.Topics;
+import stroom.proxy.aggregation.model.FilePartInfo;
+import stroom.proxy.aggregation.model.FilePartsBatch;
+import stroom.proxy.aggregation.policy.AggregationPolicy;
+import stroom.proxy.aggregation.policy.NoAggregationPolicy;
+import stroom.proxy.aggregation.policy.SizeCountAgeAggregationPolicy;
+import stroom.proxy.aggregation.processors.FilePartAggregatorProcessor;
+import stroom.proxy.aggregation.processors.FilePartsBatchProcessor;
+import stroom.proxy.aggregation.processors.InputFileInspectorProcessor;
+import stroom.proxy.aggregation.processors.InputFileRemoverProcessor;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -168,11 +168,10 @@ public class ProxyAggEndToEndExample {
 
         startStreamProcessors();
 
+        // Start a consumer to log messages on a topic
 //        ExecutorService loggerExecutorService = KafkaUtils.startMessageLoggerConsumer(
 //                GROUP_ID_BASE + "_loggingConsumer",
-//                Arrays.asList(Topics.FEED_TO_PARTS_TOPIC.getName()),
-//                Serdes.String(),
-//                new FilePartInfoSerde());
+//                Topics.FEED_TO_PARTS_TOPIC);
 
         // Give the stream processors time to fire up and get their partitions from the broker
         KafkaUtils.sleep(3_000);

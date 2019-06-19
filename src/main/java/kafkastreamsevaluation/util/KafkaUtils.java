@@ -16,10 +16,13 @@ import org.apache.kafka.streams.kstream.ForeachAction;
 import org.apache.kafka.streams.kstream.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import stroom.proxy.aggregation.TopicDefinition;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -295,9 +298,10 @@ public class KafkaUtils {
             try {
                 boolean isFirstPoll = true;
                 while (!Thread.currentThread().isInterrupted()) {
-                    final ConsumerRecords<K, V> records = kafkaConsumer.poll(100);
+                    final ConsumerRecords<K, V> records = kafkaConsumer.poll(Duration.ofMillis(500));
                     if (isFirstPoll) {
-                        //first successful poll so release a permit to mark the subscription as successful
+                        // first successful poll so release a permit to mark the subscription as successful
+                        // if it hasn't been released already
                         subscribedSemaphore.release();
                     }
                     isFirstPoll = false;
@@ -308,6 +312,7 @@ public class KafkaUtils {
                     messagesConsumer.accept(records);
                 }
             } finally {
+                LOGGER.info("Closing consumer for topics {}", topics);
                 kafkaConsumer.close();
             }
         });
@@ -325,6 +330,15 @@ public class KafkaUtils {
         LOGGER.info("Consumer started on topics {}", topics);
 
         return executorService;
+    }
+
+    public static <K,V> ExecutorService startMessageLoggerConsumer(final String groupId,
+                                                                   final TopicDefinition<K,V> topic) {
+        return startMessageLoggerConsumer(
+                groupId,
+                Collections.singletonList(topic.getName()),
+                topic.getKeySerde(),
+                topic.getValueSerde());
     }
 
     public static ExecutorService startMessageLoggerConsumer(final String groupId,
