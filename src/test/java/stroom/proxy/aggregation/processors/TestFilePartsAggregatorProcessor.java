@@ -1,9 +1,14 @@
 package stroom.proxy.aggregation.processors;
 
+import io.vavr.Tuple2;
+import kafkastreamsevaluation.util.KafkaUtils;
 import kafkastreamsevaluation.util.StreamProcessor;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.KeyValue;
+import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.TopologyTestDriver;
+import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.test.ConsumerRecordFactory;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
@@ -19,13 +24,16 @@ import stroom.proxy.aggregation.policy.AggregationPolicy;
 import stroom.proxy.aggregation.policy.NoAggregationPolicy;
 import stroom.proxy.aggregation.policy.SizeCountAgeAggregationPolicy;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -35,7 +43,7 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TestFilePartsAggregatorProcessor.class);
 
-    private static final int PARTS_PER_INPUT_FILE = 8;
+    private static final int PARTS_PER_INPUT_FILE = 1;
     private static final String FEED_PREFIX = "FEED_";
     private static final String FEED_1 = FEED_PREFIX + "1";
     private static final String FEED_NO_AGGREGATION = FEED_PREFIX + "NO_AGGREGATION";
@@ -63,33 +71,58 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
     @Test
     public void testFileSplitting() {
 
+
         runProcessorTest(feedToPartsTopic, (testDriver, consumerRecordFactory) -> {
+
+            KeyValueStore<String, FilePartsBatch> store = testDriver.getKeyValueStore(
+                    FilePartAggregatorProcessor.FEED_TO_CURRENT_BATCH_STORE);
+
+
+            KafkaUtils.dumpKeyValueStore(store);
+
 
             // submit the test msgs to the topic
             sendInputData(testDriver, consumerRecordFactory);
 
+            // We need to sleep a bit to allow any incomplete batches to age off because
+            // the transformer is comparing batch create time to system time. Advancing kafka's
+            // wall clock time only really triggers the call to punctuate which is no good
+            // on its own
+            LOGGER.info("Sleeping");
+            KafkaUtils.sleep(500);
+            LOGGER.info("Advancing wall clock time");
+            testDriver.advanceWallClockTime(10_000);
+
+            LOGGER.info("-------------------------------------------------------");
+
+            final Function<Tuple2<String, FilePartRef>, String> feedNameExtractor = Tuple2::_1;
+            final Function<Tuple2<String, FilePartRef>, String> partNameExtractor = tuple ->
+                    tuple._2().getPartBaseName();
+
             // get all the completed batches off the output topic
-            List<ProducerRecord<String, FilePartsBatch>> filePartRecords = readAllProducerRecords(
+            final List<ProducerRecord<String, FilePartsBatch>> filePartRecords = readAllProducerRecords(
                     completedBatchTopic, testDriver);
 
-            Map<String, List<FilePartsBatch>> feedToBatchesMap = filePartRecords.stream()
+            filePartRecords.stream()
+                    .flatMap(rec -> {
+                        String feedName = rec.key();
+                        return rec.value().getFileParts().stream()
+                                .map(filePartRef -> new Tuple2<>(feedName, filePartRef));
+                    })
+                    .sorted(Comparator
+                            .comparing(feedNameExtractor)
+                            .thenComparing(partNameExtractor))
+//                    .thenComparing(tuple -> tuple._2.getPartBaseName()))
+                    .forEach(tuple -> {
+                        LOGGER.info("Output part {} {}", tuple._1, tuple._2);
+                    });
+
+            LOGGER.info("-------------------------------------------------------");
+
+            final Map<String, List<FilePartsBatch>> feedToBatchesMap = filePartRecords.stream()
                     .collect(Collectors.groupingBy(
                             ProducerRecord::key, Collectors.mapping(
                                     ProducerRecord::value, Collectors.toList())));
-
-            // Check all feeds are accounted for
-            Assertions
-                    .assertThat(feedToBatchesMap.keySet())
-                    .hasSize(FEED_NAMES.length);
-
-            // Make sure all parts are accounted for
-            Assertions
-                    .assertThat(feedToBatchesMap.values()
-                    .stream()
-                    .flatMap(List::stream)
-                    .flatMap(filePartsBatch -> filePartsBatch.getFileParts().stream())
-                            .collect(Collectors.toList()))
-                    .hasSize(INPUT_PARTS_COUNT);
 
             feedToBatchesMap.forEach((feedName, batches) -> {
                 LOGGER.info("Testing feed {}", feedName);
@@ -104,6 +137,21 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
                                 .map(FilePartsBatch::isComplete)
                                 .collect(Collectors.toList()))
                         .containsOnly(Boolean.TRUE);
+
+                // Check all feeds are accounted for
+                Assertions
+                        .assertThat(feedToBatchesMap.keySet())
+                        .hasSize(FEED_NAMES.length);
+
+                // Make sure all parts are accounted for
+                Assertions
+                        .assertThat(feedToBatchesMap.values()
+                                .stream()
+                                .flatMap(List::stream)
+                                .flatMap(filePartsBatch -> filePartsBatch.getFileParts().stream())
+                                .collect(Collectors.toList()))
+                        .hasSize(INPUT_PARTS_COUNT);
+
 
                 // make sure all parts belong to the feed this batch was associated with
                 Assertions
@@ -182,6 +230,16 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
                                                                         100L)))))
                 .collect(Collectors.toList());
 
+        keyValues.stream()
+                .sorted(Comparator.comparing(kv -> kv.key))
+                .forEach(kv -> {
+                    String feedName = kv.key;
+                    FilePartInfo filePartInfo = kv.value;
+                    LOGGER.info("Input record {} {} ",
+                            feedName, filePartInfo);
+                });
+
+
         // repeatable 'random' shuffle
         Random random = new Random(123);
         Collections.shuffle(keyValues, random);
@@ -190,6 +248,7 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
                 .assertThat(keyValues)
                 .hasSize(INPUT_PARTS_COUNT);
 
+        LOGGER.info("Submitting {} input records", keyValues.size());
         sendMessages(testDriver, consumerRecordFactory, keyValues);
     }
 
@@ -198,12 +257,12 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
         final AggregationPolicy defaultAggregationPolicy = new SizeCountAgeAggregationPolicy(
                 MAX_SIZE_BYTES_DEFAULT,
                 MAX_FILE_PARTS_DEFAULT,
-                Duration.ofSeconds(10).toMillis());
+                Duration.ofMillis(500).toMillis());
 
         final AggregationPolicy customAggregationPolicy = new SizeCountAgeAggregationPolicy(
                 MAX_SIZE_BYTES_CUSTOM,
                 MAX_FILE_PARTS_CUSTOM,
-                Duration.ofSeconds(10).toMillis());
+                Duration.ofMillis(500).toMillis());
 
         final AggregationPolicy noAggregationPolicy = NoAggregationPolicy.getInstance();
 

@@ -14,6 +14,7 @@ import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.ForeachAction;
 import org.apache.kafka.streams.kstream.Predicate;
+import org.apache.kafka.streams.state.KeyValueStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import stroom.proxy.aggregation.TopicDefinition;
@@ -435,6 +436,20 @@ public class KafkaUtils {
             //abuse of a predicate as a peek method on the stream, so always return true so the
             //steam is not mutated
         };
+    }
+
+    public static <K,V> void dumpKeyValueStore(final KeyValueStore<K, V> keyValueStore) {
+
+        StringBuilder stringBuilder = new StringBuilder();
+        keyValueStore.all().forEachRemaining(keyValue -> {
+            stringBuilder.append(
+                    String.format("\n  %s: %s",
+                            keyValue.key,
+                            keyValue.value == null ? "NULL" : keyValue.value));
+        });
+        LOGGER.debug("Dumping keyValueStore {} contents{}",
+                keyValueStore.name(),
+                stringBuilder.toString());
     }
 
     private static class ProducerHolder {

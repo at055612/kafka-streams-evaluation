@@ -21,6 +21,7 @@ import java.util.Properties;
 public class FilePartAggregatorProcessor extends AbstractStreamProcessor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(FilePartAggregatorProcessor.class);
+    static final String FEED_TO_CURRENT_BATCH_STORE = "feedToCurrentBatchStore";
 
     private final Properties streamsConfig;
     private final AggregationPolicySupplier aggregationPolicySupplier;
@@ -43,7 +44,7 @@ public class FilePartAggregatorProcessor extends AbstractStreamProcessor {
         final TopicDefinition<String, FilePartInfo> feedToPartsTopic = Topics.FEED_TO_PARTS_TOPIC;
         final TopicDefinition<String, FilePartsBatch> completedBatchTopic = Topics.COMPLETED_BATCH_TOPIC;
 
-        final String storeName = "feedToCurrentBatchStore";
+        final String storeName = FEED_TO_CURRENT_BATCH_STORE;
 
         final KeyValueBytesStoreSupplier storeSupplier = Stores.persistentKeyValueStore(storeName);
 

@@ -13,7 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -25,7 +24,7 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
 
     private final String stateStoreName;
     private final AggregationPolicySupplier aggregationPolicySupplier;
-    private final BatchTimeTracker batchTimeTracker = new BatchTimeTracker();
+//    private final BatchTimeTracker batchTimeTracker = new BatchTimeTracker();
 
     private ProcessorContext processorContext;
     private KeyValueStore<String, FilePartsBatch> keyValueStore;
@@ -42,7 +41,7 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
         this.processorContext = processorContext;
         this.keyValueStore = (KeyValueStore) processorContext.getStateStore(stateStoreName);
         LOGGER.debug("Initialising transformer, estimated store size: {}", keyValueStore.approximateNumEntries());
-        initBatchTimeTracker();
+//        initBatchTimeTracker();
         if (LOGGER.isDebugEnabled()) {
             dumpExpensiveStoreCount();
             dumpKeyValueStore();
@@ -62,7 +61,7 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
         Objects.requireNonNull(feedName);
         Objects.requireNonNull(filePartInfo);
 
-        FilePartsBatch currentStoreBatch = keyValueStore.get(feedName);
+        final FilePartsBatch currentStoreBatch = keyValueStore.get(feedName);
         final AggregationPolicy aggregationPolicy = aggregationPolicySupplier.getAggregationPolicy(feedName);
 
         if (LOGGER.isDebugEnabled()) {
@@ -72,8 +71,8 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
                     currentStoreBatch == null ? "-" : currentStoreBatch.getFilePartsCount());
         }
 
-        List<FilePartsBatch> completedBatches = new ArrayList<>();
-        FilePartsBatch newStoreBatch;
+        final List<FilePartsBatch> completedBatches = new ArrayList<>();
+        final FilePartsBatch newStoreBatch;
 
         if (currentStoreBatch == null) {
             // no batch for this feed so create one
@@ -113,6 +112,7 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
 //            batchTimeTracker.remove(feedName);
 //        }
 
+
         // send our completed batch(es) (if any) downstream
         completedBatches.forEach(completedBatch -> {
                 if (!completedBatch.isComplete()) {
@@ -125,8 +125,28 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
                 processorContext.forward(feedName, completedBatch);
         });
 
+        assert assertCorrectCounts(filePartInfo, currentStoreBatch, completedBatches, newStoreBatch);
+
         // Just return null as we have sent stuff downstream manually using forward()
         return null;
+    }
+
+    private boolean assertCorrectCounts(final FilePartInfo filePartInfo,
+                                        final FilePartsBatch currentBatch,
+                                        final List<FilePartsBatch> completedBatch,
+                                        final FilePartsBatch newStoreBatch) {
+        final int currentCount = currentBatch != null ? currentBatch.getFilePartsCount() : 0;
+        final int completedCount = completedBatch.stream()
+                .mapToInt(FilePartsBatch::getFilePartsCount)
+                .sum();
+        final int newBatchCount = newStoreBatch.getFilePartsCount();
+        final int newPartCount = filePartInfo != null ? 1 : 0;
+        final int actual = currentCount + newPartCount;
+        final int expected = completedCount + newBatchCount;
+
+        LOGGER.debug("Asserting part counts are correct ({} + {}) => {} ({} + {}) => {}",
+                currentCount, newPartCount, actual, completedCount, newBatchCount, expected);
+        return actual == expected;
     }
 
     /**
@@ -224,20 +244,20 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
     /**
      * Populate the tracker by scanning over all items in the kv store
      */
-    private void initBatchTimeTracker() {
-        KeyValueIterator<String, FilePartsBatch> valuesIterator = keyValueStore.all();
-        while (valuesIterator.hasNext()) {
-            final KeyValue<String, FilePartsBatch> keyValue = valuesIterator.next();
-            final String feedName = keyValue.key;
-            final FilePartsBatch currentBatch = keyValue.value;
-            if (currentBatch != null) {
-                final AggregationPolicy aggregationPolicy = aggregationPolicySupplier.getAggregationPolicy(feedName);
-                long batchExpiryTimeEpochMs = aggregationPolicy.getBatchExpiryTimeEpochMs(currentBatch);
-
-                batchTimeTracker.put(feedName, batchExpiryTimeEpochMs);
-            }
-        }
-    }
+//    private void initBatchTimeTracker() {
+//        KeyValueIterator<String, FilePartsBatch> valuesIterator = keyValueStore.all();
+//        while (valuesIterator.hasNext()) {
+//            final KeyValue<String, FilePartsBatch> keyValue = valuesIterator.next();
+//            final String feedName = keyValue.key;
+//            final FilePartsBatch currentBatch = keyValue.value;
+//            if (currentBatch != null) {
+//                final AggregationPolicy aggregationPolicy = aggregationPolicySupplier.getAggregationPolicy(feedName);
+//                long batchExpiryTimeEpochMs = aggregationPolicy.getBatchExpiryTimeEpochMs(currentBatch);
+//
+//                batchTimeTracker.put(feedName, batchExpiryTimeEpochMs);
+//            }
+//        }
+//    }
 
     private void dumpKeyValueStore() {
         StringBuilder stringBuilder = new StringBuilder();
@@ -263,15 +283,15 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
         LOGGER.debug("Store count: {}, null values {}", countAll.sum(), countNulls.sum());
     }
 
-    private void dumpTimeTrackerContents() {
-        StringBuilder stringBuilder = new StringBuilder();
-        batchTimeTracker.iterator().forEachRemaining(batchTime -> {
-            stringBuilder.append(
-                    String.format("\n  %s: %s",
-                            batchTime.getFeedName(),
-                            Instant.ofEpochMilli(batchTime.getTimeMs()).toString()));
-        });
-        LOGGER.debug("Dumping time tracker contents{}", stringBuilder.toString());
-    }
+//    private void dumpTimeTrackerContents() {
+//        StringBuilder stringBuilder = new StringBuilder();
+//        batchTimeTracker.iterator().forEachRemaining(batchTime -> {
+//            stringBuilder.append(
+//                    String.format("\n  %s: %s",
+//                            batchTime.getFeedName(),
+//                            Instant.ofEpochMilli(batchTime.getTimeMs()).toString()));
+//        });
+//        LOGGER.debug("Dumping time tracker contents{}", stringBuilder.toString());
+//    }
 
 }

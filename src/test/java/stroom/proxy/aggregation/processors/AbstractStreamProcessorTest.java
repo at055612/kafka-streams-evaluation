@@ -3,19 +3,30 @@ package stroom.proxy.aggregation.processors;
 import kafkastreamsevaluation.util.StreamProcessor;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.TopologyTestDriver;
 import org.apache.kafka.streams.test.ConsumerRecordFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import stroom.proxy.aggregation.TopicDefinition;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.function.BiConsumer;
 
 public abstract class AbstractStreamProcessorTest {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractStreamProcessorTest.class);
 
     <K,V> ConsumerRecordFactory<K,V> getConsumerRecordFactory(final TopicDefinition<K, V> topicDefinition) {
         return new ConsumerRecordFactory<>(
@@ -96,6 +107,9 @@ public abstract class AbstractStreamProcessorTest {
         props.setProperty(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "not_used_but_required:9999");
         props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 1_000);
         props.put("cache.max.bytes.buffering", 1024L);
+
+        final String user = Optional.ofNullable(System.getProperty("user.name")).orElse("unknownUser");
+        props.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/kafka-streams-" + user);
         return props;
     }
 
@@ -103,6 +117,26 @@ public abstract class AbstractStreamProcessorTest {
                                 final BiConsumer<TopologyTestDriver, ConsumerRecordFactory<K,V>> testAction) {
 
         StreamProcessor streamProcessor = getStreamProcessor();
+
+
+        String stateDirPathStr = streamProcessor.getStreamConfig().getProperty(StreamsConfig.STATE_DIR_CONFIG);
+        if (!stateDirPathStr.startsWith("/tmp")) {
+            // as we are doing a recursive delete add a bit of protection to ensure we don't accidentally wipe our
+            // filesystem
+            throw new RuntimeException("Expecting state dir to be somewhere in /tmp");
+        }
+        Path stateDir = Paths.get(stateDirPathStr);
+
+        LOGGER.info("Deleting kafka-streams state directory {} and its contents", stateDir);
+        // Clear out the state dir
+        try {
+            Files.walk(stateDir)
+                .sorted(Comparator.reverseOrder())
+                .map(Path::toFile)
+                .forEach(File::delete);
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to delete state dir " + stateDir, e);
+        }
 
         TopologyTestDriver testDriver = new TopologyTestDriver(
                 streamProcessor.getTopology(),

@@ -9,6 +9,10 @@ public class FilePartsBatch {
 
     // TODO could consider getting rid of this as it doesn't add a lot
     private final boolean isComplete;
+    // TODO this needs to just be createTimeMs for when the batch was created
+    // rather than the create time of the oldest part in the batch. If we use create time
+    // of the oldest part then after an outage we we always get small batches.
+    // Thus we will favour getting chunky batches at the expense of latency on the parts.
     private final long minCreationTimeMs;
     private final long totalSizeBytes;
     private final List<FilePartRef> fileParts;
