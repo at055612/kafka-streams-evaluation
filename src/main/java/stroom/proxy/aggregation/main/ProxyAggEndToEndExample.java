@@ -16,7 +16,7 @@ import stroom.proxy.aggregation.policy.AggregationPolicy;
 import stroom.proxy.aggregation.policy.NoAggregationPolicy;
 import stroom.proxy.aggregation.policy.SizeCountAgeAggregationPolicy;
 import stroom.proxy.aggregation.processors.FilePartAggregatorProcessor;
-import stroom.proxy.aggregation.processors.FilePartsBatchProcessor;
+import stroom.proxy.aggregation.processors.CompletedBatchProcessor;
 import stroom.proxy.aggregation.processors.InputFileInspectorProcessor;
 import stroom.proxy.aggregation.processors.InputFileRemoverProcessor;
 
@@ -146,7 +146,7 @@ public class ProxyAggEndToEndExample {
         // TODO This will need some sort of guice provider arrangement to inject the required
         // FilePartsBatchConsumer based on config.
         // 1 filePartBatch(completed) msg => 1-N filePartConsumptionState msgs
-        final StreamProcessor filePartsBatchProcessor = new FilePartsBatchProcessor(
+        final StreamProcessor filePartsBatchProcessor = new CompletedBatchProcessor(
                 baseStreamsConfig,
                 this::acceptCompletedBatch);
         allStreamProcessors.add(filePartsBatchProcessor);

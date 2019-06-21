@@ -18,15 +18,15 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
-public class FilePartsBatchProcessor extends AbstractStreamProcessor {
+public class CompletedBatchProcessor extends AbstractStreamProcessor {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(FilePartsBatchProcessor.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(CompletedBatchProcessor.class);
 
     private final Properties streamsConfig;
     private final FilePartsBatchConsumer filePartsBatchConsumer;
 
 
-    public FilePartsBatchProcessor(final Properties baseStreamsConfig,
+    public CompletedBatchProcessor(final Properties baseStreamsConfig,
                                    final FilePartsBatchConsumer filePartsBatchConsumer) {
         this.filePartsBatchConsumer = Objects.requireNonNull(filePartsBatchConsumer);
         LOGGER.info("Initialising streams processor {} with appId {}", getName(), getAppId());

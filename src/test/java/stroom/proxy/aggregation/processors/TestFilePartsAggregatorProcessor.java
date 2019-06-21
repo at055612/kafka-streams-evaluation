@@ -232,12 +232,12 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
             sendMessages(testDriver, consumerRecordFactory, Collections.singletonList(keyValue));
 
             // get all the completed batches off the output topic
-            List<ProducerRecord<String, FilePartsBatch>> completedBatchrecords = readAllProducerRecords(
+            List<ProducerRecord<String, FilePartsBatch>> completedBatchRecords = readAllProducerRecords(
                     completedBatchTopic, testDriver);
 
             // only sent one part which won't have completed the batch
             Assertions
-                    .assertThat(completedBatchrecords)
+                    .assertThat(completedBatchRecords)
                     .hasSize(0);
 
             // incomplete batch will still be sat in the store
@@ -256,11 +256,11 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
             testDriver.advanceWallClockTime(10_000);
 
             // fetch any new completed batches from the topic
-            completedBatchrecords = readAllProducerRecords(completedBatchTopic, testDriver);
+            completedBatchRecords = readAllProducerRecords(completedBatchTopic, testDriver);
 
             // batch should have now aged off and completed
             Assertions
-                    .assertThat(completedBatchrecords)
+                    .assertThat(completedBatchRecords)
                     .hasSize(1);
 
             // completed batch should not be in the store any more
