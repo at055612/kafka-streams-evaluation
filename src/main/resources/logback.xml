@@ -9,7 +9,7 @@
         </encoder>
     </appender>
 
-    <logger name="kafkastreamsevaluation" level="info"/>
+    <logger name="kafkastreamsevaluation" level="debug"/>
     <logger name="stroom" level="info"/>
 <!--    <logger name="stroom.proxy.aggregation.policy.SizeCountAgeAggregationPolicy" level="debug"/>-->
 <!--    <logger name="stroom.proxy.aggregation.policy.NoAggregationPolicy" level="debug"/>-->

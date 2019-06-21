@@ -35,7 +35,7 @@ public class ProducerConsumerExample {
                     Collections.singletonList(INPUT_TOPIC));
 
             //little sleep to ensure consumer is started
-            KafkaUtils.sleep(200);
+            KafkaUtils.sleep(1_000);
 
 
             ProducerRecord<String, String> producerRecord = new ProducerRecord<>(
