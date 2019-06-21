@@ -3,7 +3,6 @@ package stroom.proxy.aggregation.processors;
 import kafkastreamsevaluation.util.StreamProcessor;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.TopologyTestDriver;
@@ -24,7 +23,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.function.BiConsumer;
 
-public abstract class AbstractStreamProcessorTest {
+abstract class AbstractStreamProcessorTest {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractStreamProcessorTest.class);
 
@@ -116,36 +115,43 @@ public abstract class AbstractStreamProcessorTest {
     <K,V> void runProcessorTest(final TopicDefinition<K,V> inputTopicDefinition,
                                 final BiConsumer<TopologyTestDriver, ConsumerRecordFactory<K,V>> testAction) {
 
-        StreamProcessor streamProcessor = getStreamProcessor();
+        final StreamProcessor streamProcessor = getStreamProcessor();
 
+        deleteStreamsStateDir(streamProcessor);
 
-        String stateDirPathStr = streamProcessor.getStreamConfig().getProperty(StreamsConfig.STATE_DIR_CONFIG);
+        try (final TopologyTestDriver testDriver = new TopologyTestDriver(
+                streamProcessor.getTopology(),
+                streamProcessor.getStreamConfig())) {
+
+            ConsumerRecordFactory<K,V> factory = getConsumerRecordFactory(inputTopicDefinition);
+
+            // perform the test
+            testAction.accept(testDriver, factory);
+        }
+    }
+
+    private void deleteStreamsStateDir(final StreamProcessor streamProcessor) {
+
+        final String stateDirPathStr = streamProcessor.getStreamConfig().getProperty(StreamsConfig.STATE_DIR_CONFIG);
         if (!stateDirPathStr.startsWith("/tmp")) {
             // as we are doing a recursive delete add a bit of protection to ensure we don't accidentally wipe our
             // filesystem
             throw new RuntimeException("Expecting state dir to be somewhere in /tmp");
         }
-        Path stateDir = Paths.get(stateDirPathStr);
+        final Path stateDir = Paths.get(stateDirPathStr);
 
-        LOGGER.info("Deleting kafka-streams state directory {} and its contents", stateDir);
-        // Clear out the state dir
-        try {
-            Files.walk(stateDir)
-                .sorted(Comparator.reverseOrder())
-                .map(Path::toFile)
-                .forEach(File::delete);
-        } catch (IOException e) {
-            throw new RuntimeException("Unable to delete state dir " + stateDir, e);
+        if (Files.isDirectory(stateDir)) {
+            LOGGER.info("Deleting kafka-streams state directory {} and its contents", stateDir);
+            // Clear out the state dir
+            try {
+                Files.walk(stateDir)
+                        .sorted(Comparator.reverseOrder())
+                        .map(Path::toFile)
+                        .forEach(File::delete);
+            } catch (IOException e) {
+                throw new RuntimeException("Unable to delete state dir " + stateDir, e);
+            }
         }
-
-        TopologyTestDriver testDriver = new TopologyTestDriver(
-                streamProcessor.getTopology(),
-                streamProcessor.getStreamConfig());
-
-        ConsumerRecordFactory<K,V> factory = getConsumerRecordFactory(inputTopicDefinition);
-
-        // perform the test
-        testAction.accept(testDriver, factory);
     }
 
     abstract StreamProcessor getStreamProcessor();

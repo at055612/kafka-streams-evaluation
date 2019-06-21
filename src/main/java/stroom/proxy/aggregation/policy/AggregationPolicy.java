@@ -11,15 +11,15 @@ public interface AggregationPolicy {
     boolean isBatchReady(final FilePartsBatch filePartsBatch);
 
     /**
-     * @return True if currentBatch has capacity to accept filePartInfo
+     * @return True if currentBatch has capacity to accept filePartInfo whether it completes it or not.
      */
     boolean canPartBeAddedToBatch(final FilePartsBatch currentBatch, final FilePartInfo filePartInfo);
 
     /**
-     * @return False if filePartInfo would breach the policy on its own. Intended for use when creating
-     * a new batch
+     * @return True if filePartInfo would cause a batch to be completable on its own. Intended for use when creating
+     * a new batch. False if the new batch would be incomplete
      */
-    boolean canPartBeAddedToBatch(final FilePartInfo filePartInfo);
+    boolean wouldPartCompleteBatch(final FilePartInfo filePartInfo);
 
 
     /**

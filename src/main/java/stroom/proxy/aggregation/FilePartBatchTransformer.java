@@ -65,8 +65,9 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
         final AggregationPolicy aggregationPolicy = aggregationPolicySupplier.getAggregationPolicy(feedName);
 
         if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("transform called for feed: {}, filePart: {}, current batch size: {}",
+            LOGGER.debug("transform() called for feed: {}, aggregationPolicy: {}, filePart: {}, current batch size: {}",
                     feedName,
+                    aggregationPolicy.getClass().getSimpleName(),
                     filePartInfo.getBaseName(),
                     currentStoreBatch == null ? "-" : currentStoreBatch.getFilePartsCount());
         }
@@ -77,8 +78,6 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
         if (currentStoreBatch == null) {
             // no batch for this feed so create one
             newStoreBatch = createNewBatch(completedBatches, filePartInfo, aggregationPolicy);
-
-            LOGGER.debug("Created new batch, count: " + newStoreBatch.getFilePartsCount());
         } else {
             if (aggregationPolicy.isBatchReady(currentStoreBatch)
                     || !aggregationPolicy.canPartBeAddedToBatch(currentStoreBatch, filePartInfo)) {
@@ -89,8 +88,6 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
 
                 LOGGER.debug("Completing existing batch, completed batch count: " + completedBatch.getFilePartsCount());
                 newStoreBatch = createNewBatch(completedBatches, filePartInfo, aggregationPolicy);
-
-                LOGGER.debug("Created new batch, count: " + newStoreBatch.getFilePartsCount());
             } else {
                 // The file part has been tested to ensure it wont blow any limits so just add it.
                 newStoreBatch = currentStoreBatch.addFilePart(filePartInfo);
@@ -139,7 +136,7 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
         final int completedCount = completedBatch.stream()
                 .mapToInt(FilePartsBatch::getFilePartsCount)
                 .sum();
-        final int newBatchCount = newStoreBatch.getFilePartsCount();
+        final int newBatchCount = newStoreBatch != null ? newStoreBatch.getFilePartsCount() : 0;
         final int newPartCount = filePartInfo != null ? 1 : 0;
         final int actual = currentCount + newPartCount;
         final int expected = completedCount + newBatchCount;
@@ -158,12 +155,12 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
             final FilePartInfo filePartInfo,
             final AggregationPolicy aggregationPolicy) {
         FilePartsBatch incompleteBatch = null;
-        if (!aggregationPolicy.canPartBeAddedToBatch(filePartInfo)) {
+        if (aggregationPolicy.wouldPartCompleteBatch(filePartInfo)) {
             // make a completed batch and add to the list of completed batches
-            LOGGER.debug("Creating new completed batch with part {}", filePartInfo);
+            LOGGER.debug("Creating new completed batch with 1 part {}", filePartInfo);
             completedBatches.add(new FilePartsBatch(filePartInfo, true));
         } else {
-            LOGGER.debug("Creating new incomplete batch with part {}", filePartInfo);
+            LOGGER.debug("Creating new incomplete batch with 1 part {}", filePartInfo);
             incompleteBatch = new FilePartsBatch(filePartInfo, false);
         }
         return incompleteBatch;
@@ -177,7 +174,7 @@ public class FilePartBatchTransformer implements Transformer<String, FilePartInf
 
     private void doPunctuate(long timestamp) {
         if (LOGGER.isDebugEnabled()) {
-            LOGGER.debug("doPunctuate called, estimated store size {}", keyValueStore.approximateNumEntries());
+            LOGGER.debug("doPunctuate() called, estimated store size {}", keyValueStore.approximateNumEntries());
             dumpExpensiveStoreCount();
             dumpKeyValueStore();
         }

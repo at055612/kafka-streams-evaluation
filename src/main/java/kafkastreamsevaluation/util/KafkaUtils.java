@@ -35,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 //TODO currently only <String,String> supported
@@ -450,6 +451,20 @@ public class KafkaUtils {
         LOGGER.debug("Dumping keyValueStore {} contents{}",
                 keyValueStore.name(),
                 stringBuilder.toString());
+    }
+
+    /**
+     * @return The number of entries in the store with a non-null value
+     */
+    public static <K, V> long getNonNullEntryCount(final KeyValueStore<K, V> keyValueStore) {
+        AtomicLong count = new AtomicLong();
+        keyValueStore.all()
+                .forEachRemaining(kv -> {
+                    if (kv.value != null) {
+                        count.incrementAndGet();
+                    }
+                });
+        return count.longValue();
     }
 
     private static class ProducerHolder {

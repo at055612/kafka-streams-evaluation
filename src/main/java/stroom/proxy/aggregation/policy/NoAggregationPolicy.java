@@ -37,12 +37,8 @@ public class NoAggregationPolicy implements AggregationPolicy {
         }
     }
 
-    /**
-     * @param filePartInfo
-     * @return False if filePartInfo would breach the policy on its own
-     */
     @Override
-    public boolean canPartBeAddedToBatch(final FilePartInfo filePartInfo) {
+    public boolean wouldPartCompleteBatch(final FilePartInfo filePartInfo) {
         return true;
     }
 

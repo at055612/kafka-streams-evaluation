@@ -71,6 +71,10 @@ public class FilePartsBatch {
         return isComplete;
     }
 
+    public boolean isEmpty() {
+        return fileParts.isEmpty();
+    }
+
     public long getMinCreationTimeMs() {
         return minCreationTimeMs;
     }

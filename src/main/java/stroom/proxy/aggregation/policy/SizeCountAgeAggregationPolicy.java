@@ -61,10 +61,11 @@ public class SizeCountAgeAggregationPolicy implements AggregationPolicy {
      * @return False if filePartInfo would breach the policy on its own
      */
     @Override
-    public boolean canPartBeAddedToBatch(final FilePartInfo filePartInfo) {
+    public boolean wouldPartCompleteBatch(final FilePartInfo filePartInfo) {
         Objects.requireNonNull(filePartInfo);
 
-        return filePartInfo.getSizeBytes() < maxSizeBytes;
+        return maxFileParts == 1
+                || filePartInfo.getSizeBytes() >= maxSizeBytes;
     }
 
     /**

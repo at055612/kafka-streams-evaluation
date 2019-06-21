@@ -4,9 +4,7 @@ import io.vavr.Tuple2;
 import kafkastreamsevaluation.util.KafkaUtils;
 import kafkastreamsevaluation.util.StreamProcessor;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.KeyValue;
-import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.TopologyTestDriver;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.test.ConsumerRecordFactory;
@@ -24,7 +22,6 @@ import stroom.proxy.aggregation.policy.AggregationPolicy;
 import stroom.proxy.aggregation.policy.NoAggregationPolicy;
 import stroom.proxy.aggregation.policy.SizeCountAgeAggregationPolicy;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
@@ -43,12 +40,13 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TestFilePartsAggregatorProcessor.class);
 
-    private static final int PARTS_PER_INPUT_FILE = 1;
+    private static final int PARTS_PER_INPUT_FILE = 8;
     private static final String FEED_PREFIX = "FEED_";
-    private static final String FEED_1 = FEED_PREFIX + "1";
+    private static final String FEED_DEFAULT_AGGREGATION = FEED_PREFIX + "DEFAULT_AGGREGATION";
     private static final String FEED_NO_AGGREGATION = FEED_PREFIX + "NO_AGGREGATION";
     private static final String FEED_CUSTOM_AGGREGATION = FEED_PREFIX + "CUSTOM_AGGREGATION";
-    private static final String[] FEED_NAMES = new String[]{FEED_1, FEED_NO_AGGREGATION, FEED_CUSTOM_AGGREGATION};
+    private static final String[] FEED_NAMES = new String[]{FEED_DEFAULT_AGGREGATION, FEED_NO_AGGREGATION, FEED_CUSTOM_AGGREGATION};
+//    private static final String[] FEED_NAMES = new String[]{FEED_DEFAULT_AGGREGATION};
 
 
     private static final String INPUT_FILE_PATH_1 = "/some/path/some/file1.zip";
@@ -58,6 +56,7 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
 
     private static final int MAX_SIZE_BYTES_DEFAULT = 500;
     private static final int MAX_FILE_PARTS_DEFAULT = 100;
+
     private static final long MAX_SIZE_BYTES_CUSTOM = Long.MAX_VALUE;
     private static final int MAX_FILE_PARTS_CUSTOM = 4;
 
@@ -69,17 +68,16 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
     // see if the batches get aged off by their policies
 
     @Test
-    public void testFileSplitting() {
-
+    public void testMultipleAggregationPolicies() {
 
         runProcessorTest(feedToPartsTopic, (testDriver, consumerRecordFactory) -> {
 
             KeyValueStore<String, FilePartsBatch> store = testDriver.getKeyValueStore(
                     FilePartAggregatorProcessor.FEED_TO_CURRENT_BATCH_STORE);
 
-
             KafkaUtils.dumpKeyValueStore(store);
 
+            Assertions.assertThat(KafkaUtils.getNonNullEntryCount(store)).isEqualTo(0L);
 
             // submit the test msgs to the topic
             sendInputData(testDriver, consumerRecordFactory);
@@ -89,7 +87,7 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
             // wall clock time only really triggers the call to punctuate which is no good
             // on its own
             LOGGER.info("Sleeping");
-            KafkaUtils.sleep(500);
+            KafkaUtils.sleep(1_500);
             LOGGER.info("Advancing wall clock time");
             testDriver.advanceWallClockTime(10_000);
 
@@ -100,10 +98,10 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
                     tuple._2().getPartBaseName();
 
             // get all the completed batches off the output topic
-            final List<ProducerRecord<String, FilePartsBatch>> filePartRecords = readAllProducerRecords(
+            final List<ProducerRecord<String, FilePartsBatch>> completedBatchRecords = readAllProducerRecords(
                     completedBatchTopic, testDriver);
 
-            filePartRecords.stream()
+            completedBatchRecords.stream()
                     .flatMap(rec -> {
                         String feedName = rec.key();
                         return rec.value().getFileParts().stream()
@@ -119,7 +117,7 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
 
             LOGGER.info("-------------------------------------------------------");
 
-            final Map<String, List<FilePartsBatch>> feedToBatchesMap = filePartRecords.stream()
+            final Map<String, List<FilePartsBatch>> feedToBatchesMap = completedBatchRecords.stream()
                     .collect(Collectors.groupingBy(
                             ProducerRecord::key, Collectors.mapping(
                                     ProducerRecord::value, Collectors.toList())));
@@ -165,7 +163,7 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
 
             });
 
-            List<FilePartsBatch> feed1batches = feedToBatchesMap.get(FEED_1);
+            List<FilePartsBatch> feed1batches = feedToBatchesMap.get(FEED_DEFAULT_AGGREGATION);
             List<FilePartsBatch> feedNoAggBatches = feedToBatchesMap.get(FEED_NO_AGGREGATION);
             List<FilePartsBatch> feedCustomAggBatches = feedToBatchesMap.get(FEED_CUSTOM_AGGREGATION);
 
@@ -203,9 +201,75 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
                             .allMatch(size -> 
                                     size <= MAX_SIZE_BYTES_CUSTOM))
                     .isTrue();
+
+
+            // Store should be empty as all batches should have completed
+            Assertions.assertThat(KafkaUtils.getNonNullEntryCount(store)).isEqualTo(0L);
         });
     }
 
+
+    @Test
+    public void testIncompleteBatch() {
+
+        runProcessorTest(feedToPartsTopic, (testDriver, consumerRecordFactory) -> {
+
+            final String feedName = FEED_DEFAULT_AGGREGATION;
+            final KeyValue<String, FilePartInfo> keyValue = new KeyValue<>(
+                    feedName,
+                    new FilePartInfo(
+                            INPUT_FILE_PATH_1, 1 + "_" + feedName,
+                            Instant.now().toEpochMilli(),
+                            100L));
+
+            final KeyValueStore<String, FilePartsBatch> store = testDriver.getKeyValueStore(
+                    FilePartAggregatorProcessor.FEED_TO_CURRENT_BATCH_STORE);
+
+            Assertions
+                    .assertThat(KafkaUtils.getNonNullEntryCount(store))
+                    .isEqualTo(0L);
+
+            sendMessages(testDriver, consumerRecordFactory, Collections.singletonList(keyValue));
+
+            // get all the completed batches off the output topic
+            List<ProducerRecord<String, FilePartsBatch>> completedBatchrecords = readAllProducerRecords(
+                    completedBatchTopic, testDriver);
+
+            // only sent one part which won't have completed the batch
+            Assertions
+                    .assertThat(completedBatchrecords)
+                    .hasSize(0);
+
+            // incomplete batch will still be sat in the store
+            Assertions
+                    .assertThat(KafkaUtils.getNonNullEntryCount(store))
+                    .isEqualTo(1L);
+
+
+            // We need to sleep a bit to allow any incomplete batches to age off because
+            // the transformer is comparing batch create time to system time. Advancing kafka's
+            // wall clock time only really triggers the call to punctuate which is no good
+            // on its own
+            LOGGER.info("Sleeping");
+            KafkaUtils.sleep(2500);
+            LOGGER.info("Advancing wall clock time");
+            testDriver.advanceWallClockTime(10_000);
+
+            // fetch any new completed batches from the topic
+            completedBatchrecords = readAllProducerRecords(completedBatchTopic, testDriver);
+
+            // batch should have now aged off and completed
+            Assertions
+                    .assertThat(completedBatchrecords)
+                    .hasSize(1);
+
+            // completed batch should not be in the store any more
+            Assertions
+                    .assertThat(KafkaUtils.getNonNullEntryCount(store))
+                    .isEqualTo(0L);
+
+        });
+    }
 
     @Override
     StreamProcessor getStreamProcessor() {
@@ -254,15 +318,17 @@ public class TestFilePartsAggregatorProcessor extends AbstractStreamProcessorTes
 
     private AggregationPolicySupplier buildAggregationPolicies() {
 
+        // if the max age values are set too low you will start getting partially filled batches coming out
+        // especially if you have a lot of debug logging going on.
         final AggregationPolicy defaultAggregationPolicy = new SizeCountAgeAggregationPolicy(
                 MAX_SIZE_BYTES_DEFAULT,
                 MAX_FILE_PARTS_DEFAULT,
-                Duration.ofMillis(500).toMillis());
+                Duration.ofMillis(1_500).toMillis());
 
         final AggregationPolicy customAggregationPolicy = new SizeCountAgeAggregationPolicy(
                 MAX_SIZE_BYTES_CUSTOM,
                 MAX_FILE_PARTS_CUSTOM,
-                Duration.ofMillis(500).toMillis());
+                Duration.ofMillis(1_500).toMillis());
 
         final AggregationPolicy noAggregationPolicy = NoAggregationPolicy.getInstance();
 
