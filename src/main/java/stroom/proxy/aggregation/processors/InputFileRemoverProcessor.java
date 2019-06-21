@@ -49,34 +49,10 @@ public class InputFileRemoverProcessor extends AbstractStreamProcessor {
 
         final StreamsBuilder streamsBuilder = new StreamsBuilder();
 
-////        StoreBuilder<KeyValueStore<String, FilePartConsumptionStates>> aggregatesStoreBuilder = Stores.keyValueStoreBuilder(
-////                Stores.persistentKeyValueStore("xxx"),
-////                filePartConsumptionStateTopic.getKeySerde(),
-////                filePartConsumptionStatesSerde);
-//
-//        streamsBuilder.addStateStore(aggregatesStoreBuilder);
-
         // TODO need to ensure there is no compaction/caching of this topic as this is not
         // a changelog and thus each msg value matters
         final KStream<String, FilePartConsumptionState> filePartConsumedStateStream = streamsBuilder
                 .stream(filePartConsumptionStateTopic.getName(), filePartConsumptionStateTopic.getConsumed());
-
-//        final KTable<String, FilePartConsumptionStates> filePartConsumedStatesTable = streamsBuilder
-//                .table(Constants.INPUT_FILE_CONSUMED_STATE_TOPIC,
-//                        Consumed.with(stringSerde, filePartConsumptionStatesSerde));
-
-//        final Initializer<FilePartConsumptionStates> initialiser = FilePartConsumptionStates::new;
-//
-//        final Aggregator<String, FilePartConsumptionState, FilePartConsumptionStates> aggregator = (key, value, aggregate) ->
-//            aggregate.put(value.getPartBaseName(), value.isConsumed());
-
-//        KeyValueBytesStoreSupplier storeSupplier = Stores.persistentKeyValueStore(CONSUMPTION_STATES_STORE);
-//
-//        Materialized<String, FilePartConsumptionStates, KeyValueStore<Bytes, byte[]>> materialized = Materialized.as(storeSupplier);
-//
-//                .withKeySerde(filePartConsumptionStateTopic.getKeySerde())
-//                .withValueSerde(filePartConsumptionStatesSerde);
-
 
         // Done in two steps to make generics accept it.
         // Not sure why the store is of <Bytes, byte[]>
@@ -93,46 +69,6 @@ public class InputFileRemoverProcessor extends AbstractStreamProcessor {
                         this::consumptionStateAggregator,
                         materialized
                 );
-
-        // stream the changes to the ktable so we see each aggregate as it is changed
-//        consumptionStatesTable
-//                .toStream()
-//                .filter((key, value) -> {
-//                    if (LOGGER.isDebugEnabled()) {
-//                        LOGGER.debug("{} {}", key, value);
-//                    }
-//                    return value != null && value.haveAllBeenConsumed();
-//                })
-//                .foreach((inputFilePath, filePartConsumptionStates) -> {
-//                    if (filePartConsumptionStates != null && filePartConsumptionStates.haveAllBeenConsumed()) {
-//                        LOGGER.debug("File {} can now be deleted", inputFilePath);
-//
-//                        inputFileRemover.remove(inputFilePath);
-//
-//                    } else {
-//                        LOGGER.error("Shouldn't get here!!! {} {}", inputFilePath, filePartConsumptionStates);
-//                    }
-//
-//                    // map to a tombstone entry to remove the completed set of states
-////                    return new KeyValue<>(inputFilePath, (FilePartConsumptionStates) null);
-//
-//
-//                    // TODO may want to tombstone the aggregate topic as we no longer need the value
-//                });
-
-//        KGroupedStream<String,<Tuple2<String,Boolean>>> groupedStream = filePartConsumedStateStream
-//                .mapValues((readOnlyKey, value) -> new Tuple2<>(readOnlyKey.getPartBaseName(), value))
-//                .groupBy((key, value) -> key.getInputFilePath());
-
-//                .aggregate(
-//                        () -> new FilePartConsumptionStates(),
-//                        (key, value, aggregate) ->
-//                                aggregate.put(value._1, value._2),
-//                        Materialized
-//                                .as("consumedStates").
-//                );
-//                                .withKeySerde(stringSerde)
-//                                .withValueSerde(filePartConsumptionStatesSerde));
 
         return streamsBuilder.build();
     }
