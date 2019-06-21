@@ -11,7 +11,7 @@
 
     <logger name="kafkastreamsevaluation" level="info"/>
     <logger name="stroom" level="info"/>
-    <logger name="stroom.proxy.aggregation.policy.SizeCountAgeAggregationPolicy" level="debug"/>
+<!--    <logger name="stroom.proxy.aggregation.policy.SizeCountAgeAggregationPolicy" level="debug"/>-->
 <!--    <logger name="stroom.proxy.aggregation.policy.NoAggregationPolicy" level="debug"/>-->
 <!--    <logger name="stroom.proxy.aggregation.FilePartBatchTransformer" level="debug"/>-->
 

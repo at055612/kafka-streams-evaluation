@@ -67,6 +67,7 @@ abstract class AbstractStreamProcessorTest {
                            final K key,
                            final V value) {
 
+        LOGGER.debug("Sending key: {}, value: {}", key, value);
         ConsumerRecord<byte[], byte[]> consumerRecord = consumerRecordFactory.create(
                 key,
                 value);

@@ -85,7 +85,9 @@ public class ProxyAggEndToEndExample {
     the files to local disk until connectivity was resumed.
 
     1. We need to deal with failure conditions, e.g. files that can't be inspected. The file path would need to
-    go onto a bad file topic or similar so the bad file could be moved/logged/etc.
+    go onto a bad file topic or similar so the bad file could be moved/logged/etc. Same goes for failure to consume
+    a completed batch. We probably need a means to reprocess all files in a dir, e.g. running main() that squirts
+    the path of all files for reprocessing onto the inputFile topic.
 
     1. Ideally we want some form of prioritisation of the filePartInfo msgs. We would want some polic(y|ies) to
     assign a priority based on feedName (and possibly the createTimeMs of the part). This may involve having a
