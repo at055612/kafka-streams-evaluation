@@ -7,6 +7,7 @@ import org.apache.kafka.clients.producer.RecordMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -34,13 +35,13 @@ public class ProducerConsumerExample {
                     Collections.singletonList(INPUT_TOPIC));
 
             //little sleep to ensure consumer is started
-//            KafkaUtils.sleep(200);
+            KafkaUtils.sleep(1_000);
 
 
             ProducerRecord<String, String> producerRecord = new ProducerRecord<>(
                     INPUT_TOPIC,
                     "jblogs",
-                    "Hello World");
+                    "Hello World - " + Instant.now().toString());
 
             List<Future<RecordMetadata>> futures = KafkaUtils.sendMessages(Collections.singletonList(producerRecord));
 
