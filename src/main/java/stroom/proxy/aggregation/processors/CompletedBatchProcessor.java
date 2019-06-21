@@ -65,7 +65,7 @@ public class CompletedBatchProcessor extends AbstractStreamProcessor {
         try {
             filePartsBatchConsumer.accept(feedName, filePartsBatch);
         } catch (Exception e) {
-            // TODO Exception handling needs tought, maybe some kind of dead letter queue
+            // TODO Exception handling needs thought, maybe some kind of dead letter queue
             throw new RuntimeException(String.format(
                     "Error consuming batch %s, %s", feedName, filePartsBatch), e);
         }
